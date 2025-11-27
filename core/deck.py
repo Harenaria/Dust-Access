@@ -14,7 +14,7 @@ class Deck:
         skill_df = df.query('Type == "Skill" or Type == "Instant"', inplace=False)
         cantrip_df = df.query('Type == "Cantrip"', inplace=False)
         for i in range(len(equip_df)):
-            for n in range(equip_df['in_deck'].iloc[i]):
+            for n in range(int(equip_df['in_deck'].iloc[i])):
                 self.cards.append(card.EquipCard(
                     equip_df['Name'].iloc[i],
                     equip_df['Text'].iloc[i],

@@ -1,5 +1,6 @@
-import ast
-
+class Effects:
+    def __init__(self):
+        pass
 
 def solveEffect(effectStr, resolver):
     if effectStr is None or not isinstance(effectStr, str):
@@ -23,7 +24,3 @@ def solveEffect(effectStr, resolver):
         print(f"[Effect Error] Invalid Syntax: '{clean_effect}'")
     except Exception as e:
         print(f"[Effect Error] Invalid Syntax: '{clean_effect}': {e}")
-
-class Effects:
-    def __init__(self):
-        pass
