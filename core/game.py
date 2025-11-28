@@ -19,6 +19,7 @@ class Game:
         self.arePlayersReady = [False, False]
         # noinspection PyTypeChecker
         self.isPlaying: bool = 0  # 0 per P1, 1 per P2
+        self.hasMulligan = [False, False]
         self.phase: Phases = Phases.SETUP
         self.winner: Winner = Winner.NONE
         self.logs: List[str] = []
@@ -112,8 +113,10 @@ class Game:
             case Actions.MULLIGAN:
                 if self.phase != Phases.SETUP:
                     return {"valid": False, "error": "You can't mulligan in this phase"}
-                else:
-                    return self._deal_init_hand(player)
+                if self.hasMulligan[player]:
+                    return {"valid": False, "error": "You've already used your mulligan"}
+                self.hasMulligan[player] = True
+                return self._deal_init_hand(player)
 
             case Actions.DISCARD:
                 if self.phase != Phases.END:
@@ -307,10 +310,10 @@ class Game:
     def calcWeaponDamage(self, player: int):
         # Damage = (Base + Stat)
         weapon: WeaponCard = self.players[player].equippedCards['Weapon']
-        stat = self.calcPlayerStat(player, weapon.AtkStat)
-
         if weapon is None:
             return 1
+        stat = self.calcPlayerStat(player, weapon.AtkStat)
+
 
         match weapon.AtkFunc:
             case Scaling.LINEAR:

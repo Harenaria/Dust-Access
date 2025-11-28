@@ -9,6 +9,28 @@ class Deck:
     def __init__(self, deckID:int):
         self.cards = list()
         df = pd.read_csv("".join(['./data/', str(deckID), '.csv']))
+        df = df.fillna({
+            'PowerIncrease': 0,
+            'TenacityIncrease': 0,
+            'EfficiencyIncrease': 0,
+            'SensitivityIncrease': 0,
+            'DurabilityIncrease': 0,
+            'AtkCoeff': 0,
+            'CD': 0,
+            'Level': 1,  # Default if empty
+            'is2Handed': 0,  # Default 0 (False)
+            'Text': '',
+            'Flavor': ''
+        })
+
+        # Floats to int (we don't need them)
+        cols_to_int = ['PowerIncrease', 'TenacityIncrease', 'EfficiencyIncrease',
+                       'SensitivityIncrease', 'DurabilityIncrease', 'CD', 'Level']
+        for col in cols_to_int:
+            if col in df.columns:
+                df[col] = df[col].astype(int)
+
+        
         equip_df = df.query('Type == "Head" or Type == "Chest" or Type == "Bracers" or Type == "Boots" or Type == "Off-Hand"', inplace=False)
         weapon_df = df.query('Type == "Weapon" or Type == "Dual"', inplace=False)
         skill_df = df.query('Type == "Skill" or Type == "Instant"', inplace=False)

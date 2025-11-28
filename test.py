@@ -236,19 +236,38 @@ def draw_logs(logs):
         print(f" > {colored_log}")
 
 
-def get_valid_commands(phase, hand, hand_limit=5):
+def get_valid_commands(game, player_idx):
+    """Restituisce la stringa dei comandi disponibili in base allo stato del gioco"""
+    phase = game.phase
+    p = game.players[player_idx]
+    hand = p.hand
+    hand_limit = 5
+
     cmds = []
+
     if phase == Phases.SETUP:
-        cmds = ["[M]ulligan", "[K]eep"]
+        # Controllo Mulligan: Se esiste la lista nel gioco e il giocatore è False
+        has_mulliganed = False
+        if hasattr(game, 'hasMulligan'):
+            has_mulliganed = game.hasMulligan[player_idx]
+
+        if not has_mulliganed:
+            cmds.append("[M]ulligan")
+
+        cmds.append("[K]eep")
+
     elif phase == Phases.PREPARATION:
         cmds = ["[P]lace Skill", "[F]inish Phase"]
+
     elif phase == Phases.DUEL:
         cmds = ["[A]ttack", "[S]kill Activ", "[U]se Equip", "[E]quip Hand", "[C]ast Cantrip", "[F]inish"]
+
     elif phase == Phases.END:
         if len(hand) > hand_limit:
             cmds = ["[D]iscard"]
         else:
             cmds = ["[F]inish Turn"]
+
     return " | ".join(cmds)
 
 
@@ -285,7 +304,10 @@ while game.winner == Winner.NONE:
         continue
 
     # 6. Command Input
-    valid_cmds = get_valid_commands(game.phase, act_p.hand)
+    # --- MODIFICA QUI ---
+    valid_cmds = get_valid_commands(game, current_p_idx)
+    # --------------------
+
     print(f"\n{C.BOLD}COMMANDS:{C.RESET} {valid_cmds}")
 
     try:
