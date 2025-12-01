@@ -29,7 +29,8 @@ class AccessorClass(StrEnum):
     MEDIUM = 'Medium'
     LIGHT = 'Light'
 class CardType(StrEnum):
-    SPE_ADVANCED = 'Advanced'
+    BASE = 'Base'
+    ADVANCED = 'Advanced'
     WEAPON = 'Weapon'
     DUAL = 'Dual'
     OFF_HAND = 'Off-Hand'

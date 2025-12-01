@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "dust-access-simulator"
+version = "0.0.1"
+description = "A Simulator for the game Dust Access"
+authors = ["Maria Vicidomini <a.vicidomini36@studenti.unisa.it>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+poetry-core = "^2.2.1"
+pandas = "^2.3.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

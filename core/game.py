@@ -6,109 +6,137 @@ from core.enums import Winner, Phases, Actions, CardType, Scaling
 from core.player import Player
 
 
-def matchCreator():
-    # Assumiamo che Player venga inizializzato con i flag corretti o li aggiungiamo dinamicamente
+def dbg_matchCreator():
     players = [Player(True, "P1", 0, "Scraper"), Player(False, "P2", 0, "Scraper")]
+    return Game(players)
+
+def matchCreator(name1: str, deck1: int, spec1: str, name2: str, deck2: int, spec2: str):
+    players = [Player(True, name1, deck1, spec1), Player(False, name2, deck2, spec2)]
     return Game(players)
 
 
 class Game:
     def __init__(self, players: List[Player]):
         self.players: List[Player] = players
-        self.turn: int = 1  # Partiamo dal turno 1
+        self.turn: int = 1
         self.arePlayersReady = [False, False]
         # noinspection PyTypeChecker
         self.isPlaying: bool = 0  # 0 per P1, 1 per P2
         self.hasMulligan = [False, False]
+        self.ready_in_setup = [False, False]
         self.phase: Phases = Phases.SETUP
         self.winner: Winner = Winner.NONE
         self.logs: List[str] = []
 
-        # Inizializzazione flag azioni se non presenti nella classe Player
-        for p in self.players:
-            p.hasTacticalAction = False
-            p.hasCombatAction = False
-
     def nextPhase(self):
-        # Gestione del flusso di gioco aggiornato al Ruleset v2
+        match self.phase:
+            case Phases.SETUP:
+                # Se le mani sono vuote, distribuiscile e resta in Setup (attendi Mulligan)
+                if len(self.players[0].hand) == 0:
+                    self._deal_init_hand(0)
+                    self._deal_init_hand(1)
+                    return
 
-        if self.phase == Phases.SETUP:
-            if len(self.players[0].hand) == 0:
-                self._deal_init_hand(0)
-                self._deal_init_hand(1)
-                return
-            # Il P1 inizia saltando la pescata (Start -> Prep) nel Ruleset v1/v2,
-            # ma per semplicità seguiamo il flusso standard, il draw check è in LOOT.
-            self.phase = Phases.START
-            self._handle_start_phase_logic()
-            self.nextPhase()  # Auto-advance dopo logica start
+                # Setup finito -> Inizio Partita
+                self.phase = Phases.START
+                self._handle_start_phase_logic()
+                self.nextPhase()  # Auto-advance: START -> LOOT
 
-        elif self.phase == Phases.START:
-            self.phase = Phases.LOOT
-            self._handle_loot_phase_logic()
-            self.nextPhase()  # Auto-advance dopo pescata
+            case Phases.START:
+                self.phase = Phases.LOOT
+                self._handle_loot_phase_logic()
+                self.nextPhase()  # Auto-advance: LOOT -> PREP
 
-        elif self.phase == Phases.LOOT:
-            self.phase = Phases.PREPARATION
+            case Phases.LOOT:
+                self.phase = Phases.PREPARATION
 
-        elif self.phase == Phases.PREPARATION:
-            self.phase = Phases.DUEL
+            case Phases.PREPARATION:
+                self.phase = Phases.DUEL
 
-        elif self.phase == Phases.DUEL:
-            self.phase = Phases.END
-            # Controllo scarto avviene QUI, non si esce finché hand <= 5
-            player = self.players[self.isPlaying]
-            if len(player.hand) > 5:
-                self.logs.append(f"{player.accessorName} must discard down to 5 cards.")
-                return  # Resta in END phase aspettando azione DISCARD
+            case Phases.DUEL:
+                self.phase = Phases.END
+                # Richiamiamo subito nextPhase per entrare nel case END
+                # e verificare immediatamente se bisogna scartare
+                self.nextPhase()
 
-            self._handle_end_phase_logic()  # Effetti fine turno
+            case Phases.END:
+                player = self.players[self.isPlaying]
 
-            # Cambio Turno
-            self.isPlaying = 1 - self.isPlaying
-            if self.isPlaying == 0:
+                # BLOCCO CRITICO: Controllo limite mano
+                if len(player.hand) > 5:
+                    self.logs.append(f"{player.accessorName} must discard down to 5 cards.")
+                    return  # Si ferma qui finché il giocatore non scarta
+
+                # Se la mano è ok, procedi al cambio turno
+                self._handle_end_phase_logic()
+
+                # Scambio Giocatore (0 -> 1 -> 0...)
+                self.isPlaying = 1 - self.isPlaying
                 self.turn += 1
 
-            self.phase = Phases.START
-            self._handle_start_phase_logic()  # Esegui logica start per il nuovo giocatore
-            self.nextPhase()
+                self.phase = Phases.START
+                self._handle_start_phase_logic()
+                self.nextPhase()
 
     def receiveAction(self, player: bool, action: Actions, args: Dict[str, Any]):
         if self.winner != Winner.NONE:
             return {"valid": False, "error": "Game is already over"}
         if player != self.isPlaying:
-            return {"valid": False, "error": "It's not your turn"}
+            # Eccezione: Nel SETUP sincrono permettiamo azione se è il proprio setup
+            if not (self.phase == Phases.SETUP and not self.ready_in_setup[player]):
+                return {"valid": False, "error": "It's not your turn"}
 
         effectResolver = Effects()
         current_player = self.players[player]
 
         match action:
             case Actions.PASS_PHASE:
+                # 1. SETUP
                 if self.phase == Phases.SETUP:
-                    self.arePlayersReady[self.isPlaying] = True
-                    # DEBUG: auto-ready P2 for testing
-                    self.arePlayersReady[1] = True
-                    while not (self.arePlayersReady[0] and self.arePlayersReady[1]): pass
-                    self.nextPhase()
-                    return {"valid": True, "message": "Hand Kept, Game Starting"}
+                    self.ready_in_setup[player] = True
+                    if self.ready_in_setup[0] and self.ready_in_setup[1]:
+                        self.isPlaying = 0  # Inizia P1
+                        self.nextPhase()
+                        return {"valid": True, "message": "Game Starting!"}
+                    else:
+                        # Hack per visualizzazione: se l'altro non è pronto, switchiamo
+                        # visivamente l'active player per far attendere il client
+                        if self.isPlaying == player:
+                            self.isPlaying = 1 - player
+                        return {"valid": True, "message": "Waiting for opponent..."}
 
+                # 2. PREPARATION -> DUEL
                 elif self.phase == Phases.PREPARATION:
-                    self.nextPhase()  # Va a DUEL
+                    self.nextPhase()
                     return {"valid": True}
 
+                # 3. DUEL -> END
                 elif self.phase == Phases.DUEL:
-                    self.nextPhase()  # Va a END
+                    self.nextPhase()
                     return {"valid": True}
 
+                # 4. END -> NEW TURN (START)
+                # QUESTO BLOCCO È CRUCIALE PER USCIRE DALLA END PHASE
                 elif self.phase == Phases.END:
-                    # Permette di passare solo se la mano è ok
                     if len(current_player.hand) <= 5:
-                        self.nextPhase()  # Va a START (nuovo turno)
+                        self.nextPhase()  # Scatena la transizione END -> START -> LOOT -> PREP
                         return {"valid": True}
                     else:
-                        return {"valid": False, "error": "You must discard cards first"}
+                        return {"valid": False, "error": "You must discard down to 5 cards first"}
 
-                return {"valid": False}
+                return {"valid": False, "error": "Cannot pass phase now"}
+
+            case Actions.DISCARD:
+                if self.phase != Phases.END:
+                    return {"valid": False, "error": "Can only discard in End phase"}
+                if len(current_player.hand) <= 5:
+                    return {"valid": False, "error": "Hand size OK"}
+
+                if args['index'] >= len(current_player.hand): return {"valid": False, "error": "Idx"}
+                card = current_player.hand.pop(args['index'])
+                self.logs.append(f"{current_player.accessorName} discarded {card.name}")
+
+                return {"valid": True}
 
             case Actions.MULLIGAN:
                 if self.phase != Phases.SETUP:
@@ -117,22 +145,6 @@ class Game:
                     return {"valid": False, "error": "You've already used your mulligan"}
                 self.hasMulligan[player] = True
                 return self._deal_init_hand(player)
-
-            case Actions.DISCARD:
-                if self.phase != Phases.END:
-                    return {"valid": False, "error": "Can only discard in End phase"}
-
-                if len(current_player.hand) <= 5:
-                    return {"valid": False, "error": "Hand size is OK, no need to discard"}
-
-                card = current_player.hand.pop(args['index'])
-                self.logs.append(f"{current_player.accessorName} discarded {card.name}")
-
-
-                if len(current_player.hand) <= 5:
-                    self.nextPhase()
-
-                return {"valid": True}
 
             case Actions.PLAY:
 

@@ -1,0 +1,184 @@
+import socket
+import pickle
+import copy
+import time
+import sys
+from core.game import matchCreator
+from core.enums import Winner, Phases
+
+# Configurazione
+HOST = '127.0.0.1'
+PORT = 65432
+TIMEOUT_SEC = 5.0  # Timeout per le operazioni socket (evita blocchi infiniti)
+
+
+class ClientDisconnected(Exception):
+    pass
+
+
+class DustServer:
+    def __init__(self):
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server.bind((HOST, PORT))
+        self.server.listen(2)
+
+        self.clients = [None, None]
+        self.game = matchCreator()
+
+        # Inizializza setup sincrono
+        self.game.ready_in_setup = [False, False]
+        self.game.nextPhase()
+
+    def wait_for_connection(self, player_idx):
+        print(f"[*] In attesa di P{player_idx + 1}...")
+        while True:
+            try:
+                conn, addr = self.server.accept()
+                print(f"[+] P{player_idx + 1} connesso da {addr}")
+
+                # Impostiamo un timeout: se il client smette di rispondere per 5s, lo consideriamo morto
+                conn.settimeout(TIMEOUT_SEC)
+
+                self.clients[player_idx] = conn
+                self.raw_send(conn, player_idx)  # Handshake ID
+                return True
+            except socket.timeout:
+                continue
+            except Exception as e:
+                print(f"[!] Errore connessione P{player_idx + 1}: {e}")
+                if conn: conn.close()
+
+    def raw_send(self, conn, data):
+        serialized = pickle.dumps(data)
+        conn.sendall(len(serialized).to_bytes(4, byteorder='big'))
+        conn.sendall(serialized)
+
+    def send_to(self, player_idx, data):
+        conn = self.clients[player_idx]
+        if conn is None: raise ClientDisconnected(player_idx)
+        try:
+            self.raw_send(conn, data)
+        except Exception:
+            raise ClientDisconnected(player_idx)
+
+    def recv_from(self, player_idx):
+        conn = self.clients[player_idx]
+        if conn is None: raise ClientDisconnected(player_idx)
+        try:
+            # recv è bloccante ma rispetta il settimeout(TIMEOUT_SEC)
+            len_bytes = conn.recv(4)
+            if not len_bytes: raise ClientDisconnected(player_idx)
+
+            msg_len = int.from_bytes(len_bytes, byteorder='big')
+            data = b""
+            while len(data) < msg_len:
+                packet = conn.recv(4096)
+                if not packet: raise ClientDisconnected(player_idx)
+                data += packet
+            return pickle.loads(data)
+        except socket.timeout:
+            print(f"[!] Timeout P{player_idx + 1}!")
+            raise ClientDisconnected(player_idx)
+        except Exception:
+            raise ClientDisconnected(player_idx)
+
+    def sanitize_state(self, real_game, player_idx_to_send_to):
+        game_view = copy.deepcopy(real_game)
+        opponent_idx = 1 - player_idx_to_send_to
+        for card in game_view.players[opponent_idx].hand:
+            card.name = "Covered"
+            card.Text = "?"
+            card.PowerIncrease = 0
+            if not hasattr(card, 'CD'): card.CD = 0
+        return game_view
+
+    def run(self):
+        print(f"[*] Server attivo su {HOST}:{PORT}")
+        self.wait_for_connection(0)
+        self.wait_for_connection(1)
+        print("[*] Partita iniziata.")
+
+        while self.game.winner == Winner.NONE:
+            try:
+                # -------------------------------------------------
+                # 1. INVIO STATO
+                # -------------------------------------------------
+                self.send_to(0, self.sanitize_state(self.game, 0))
+                self.send_to(1, self.sanitize_state(self.game, 1))
+
+                # -------------------------------------------------
+                # CHECK FASI AUTOMATICHE (Server-Side Auto-Advance)
+                # -------------------------------------------------
+                # Se siamo in START o LOOT, il server deve avanzare da solo
+                if self.game.phase in [Phases.START, Phases.LOOT]:
+                    print(f"[*] Auto-advancing phase {self.game.phase.name}...")
+                    time.sleep(0.5)  # Piccolo delay per dare tempo ai client di vedere la fase (opzionale)
+
+                    # Chiamiamo nextPhase direttamente.
+                    # Nota: nextPhase in game.py gestisce la logica (pesca carte, etc)
+                    self.game.nextPhase()
+
+                    # Torniamo all'inizio del loop per inviare il NUOVO stato (es. PREPARATION)
+                    continue
+
+                # -------------------------------------------------
+                # 2. RICEZIONE INPUT (Solo se fase non automatica)
+                # -------------------------------------------------
+                active = self.game.isPlaying
+
+                # ... (resto del codice input invariato) ...
+                self.clients[active].settimeout(None)
+                try:
+                    action_dict = self.recv_from(active)
+                finally:
+                    self.clients[active].settimeout(TIMEOUT_SEC)
+
+                # 3. ESECUZIONE
+                # ... (resto del codice esecuzione invariato) ...
+                print(f"[*] P{active + 1} -> {action_dict['action'].name}")
+                acting_player = active
+                res = self.game.receiveAction(acting_player, action_dict['action'], action_dict['args'])
+                self.send_to(acting_player, res)
+
+            except ClientDisconnected as e:
+                # ... (gestione disconnessione invariata) ...
+                dropout = e.args[0]
+                winner = 1 - dropout
+                print(f"\n{C.RED}[!] P{dropout + 1} DISCONNESSO.{C.RESET}")
+                print(f"{C.GREEN}[*] VITTORIA A TAVOLINO PER P{winner + 1}{C.RESET}")
+
+                self.game.winner = Winner(winner + 1)
+
+                # Prova a notificare il vincitore
+                try:
+                    self.send_to(winner, self.sanitize_state(self.game, winner))
+                except:
+                    pass
+                break
+
+        self.cleanup()
+
+    def cleanup(self):
+        for c in self.clients:
+            if c:
+                try:
+                    c.close()
+                except:
+                    pass
+        self.server.close()
+
+
+class C:
+    RESET = "\033[0m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+
+
+if __name__ == "__main__":
+    srv = DustServer()
+    try:
+        srv.run()
+    except KeyboardInterrupt:
+        srv.cleanup()

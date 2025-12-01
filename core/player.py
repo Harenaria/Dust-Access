@@ -39,8 +39,8 @@ class Player:
     currentEfficiency:int
     currentTenacity:int
     currentSensitivity:int
-    hasAction:bool
-    hasBonusAction:bool
+    hasTacticalAction:bool
+    hasCombatAction:bool
     def __init__(self, isFirstPlayer:bool, accessorName:str, deckID:int, specName:str):
         self.level = 1
         self.equippedCards = {
@@ -65,5 +65,5 @@ class Player:
         self.currentEfficiency = self.specialization.efficiency
         self.currentTenacity = self.specialization.tenacity
         self.currentSensitivity = self.specialization.sensitivity
-        self.hasAction = True
-        self.hasBonusAction = True
+        self.hasTacticalAction = True
+        self.hasCombatAction = True

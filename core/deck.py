@@ -4,6 +4,49 @@ from core import card
 from core import enums
 
 
+def validate_deck(deck_id: int):
+    """Validates a deck: must have exactly 60 cards and max 3 copies per card.
+    Returns (is_valid, error_message) tuple."""
+    try:
+        df = pd.read_csv(f"./data/{deck_id}.csv")
+        if 'in_deck' not in df.columns or 'Name' not in df.columns:
+            return False, "Deck file missing required columns"
+        
+        # Filter out specialization entries (they don't count toward 60 cards)
+        loot_cards_df = df[~df['Type'].isin([enums.CardType.BASE, enums.CardType.ADVANCED])]
+        
+        total_cards = loot_cards_df['in_deck'].sum()
+        if total_cards != 60:
+            return False, f"Deck must have exactly 60 cards, found {total_cards}"
+        
+        # Check max 3 copies per card
+        max_copies = loot_cards_df['in_deck'].max()
+        if max_copies > 3:
+            return False, f"Deck has cards with more than 3 copies (max: {max_copies})"
+        
+        return True, "Valid"
+    except Exception as e:
+        return False, f"Error validating deck: {e}"
+
+
+def get_deck_specializations(deck_id: int):
+    """Extracts available specializations from a deck file.
+    Returns list of specialization names that are marked as available (in_deck > 0)."""
+    try:
+        df = pd.read_csv(f"./data/{deck_id}.csv")
+        
+        # Look for specialization entries (Type is "Base", "Advanced", or "SPE")
+        spec_df = df[df['Type'].isin(['Base', 'Advanced'])]
+        
+        # Filter to only those with in_deck > 0 (available)
+        available_specs = spec_df[spec_df['in_deck'] > 0]['Name'].tolist()
+        
+        return available_specs
+    except Exception as e:
+        # If no specializations found or error, return empty list
+        return []
+
+
 # noinspection PyTypeChecker
 class Deck:
     def __init__(self, deckID:int):
@@ -31,10 +74,13 @@ class Deck:
                 df[col] = df[col].astype(int)
 
         
-        equip_df = df.query('Type == "Head" or Type == "Chest" or Type == "Bracers" or Type == "Boots" or Type == "Off-Hand"', inplace=False)
-        weapon_df = df.query('Type == "Weapon" or Type == "Dual"', inplace=False)
-        skill_df = df.query('Type == "Skill" or Type == "Instant"', inplace=False)
-        cantrip_df = df.query('Type == "Cantrip"', inplace=False)
+        # Filter out specialization entries - they're not part of the loot deck
+        loot_df = df[~df['Type'].isin(['Base', 'Advanced', 'SPE'])]
+        
+        equip_df = loot_df.query('Type == "Head" or Type == "Chest" or Type == "Bracers" or Type == "Boots" or Type == "Off-Hand"', inplace=False)
+        weapon_df = loot_df.query('Type == "Weapon" or Type == "Dual"', inplace=False)
+        skill_df = loot_df.query('Type == "Skill" or Type == "Instant"', inplace=False)
+        cantrip_df = loot_df.query('Type == "Cantrip"', inplace=False)
         for i in range(len(equip_df)):
             for n in range(int(equip_df['in_deck'].iloc[i])):
                 self.cards.append(card.EquipCard(
