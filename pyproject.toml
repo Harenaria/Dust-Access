@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.13"
 poetry-core = "^2.2.1"
 pandas = "^2.3.3"
+flet = "^0.28.3"
 
 
 [build-system]

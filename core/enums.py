@@ -50,4 +50,7 @@ class Stats(StrEnum):
 class Scaling(StrEnum):
     LINEAR = 'LINEAR'
     MULTIPLICATIVE = 'MULTIPLICATIVE'
+class Counter(StrEnum):
+    RAGE = 'Rage'
+    MOMENTUM = 'Momentum'
 #---------------------------

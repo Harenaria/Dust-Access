@@ -1,8 +1,18 @@
 class Effects:
     def __init__(self):
-        pass
+        self.game = None
 
-def solveEffect(effectStr, resolver):
+    def playCounter(self, counterName, num):
+        # Aggiunge i counter al giocatore attivo
+        active_player_idx = self.game.isPlaying
+        for _ in range(num):
+            self.game.players[active_player_idx].counters.append(counterName)
+
+        self.game.recalculateStats(active_player_idx)
+
+
+def solveEffect(effectStr, resolver, gameState):
+    resolver.game = gameState
     if effectStr is None or not isinstance(effectStr, str):
         return
 
@@ -23,4 +33,4 @@ def solveEffect(effectStr, resolver):
     except SyntaxError:
         print(f"[Effect Error] Invalid Syntax: '{clean_effect}'")
     except Exception as e:
-        print(f"[Effect Error] Invalid Syntax: '{clean_effect}': {e}")
+        print(f"[Effect Error] Executing '{clean_effect}': {e}")

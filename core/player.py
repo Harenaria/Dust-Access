@@ -3,6 +3,7 @@ from typing import List
 
 from core.card import Card
 from core.deck import Deck
+from core.enums import Counter
 from dataclasses import dataclass
 import pandas as pd
 
@@ -30,6 +31,7 @@ class Player:
     isFirstPlayer:bool
     deck: Deck
     hand: List[Card]
+    counters: List[Counter]
     accessorName:str
     specialization:Specialization
     level:int
@@ -58,6 +60,7 @@ class Player:
         self.specialization = Specialization(specName)
         self.deck = Deck(deckID)
         self.hand = list()
+        self.counters = list()
         random.shuffle(self.deck.cards)
         self.currentHP = self.specialization.durability
         self.currentDurability = self.specialization.durability

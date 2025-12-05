@@ -1,0 +1,32 @@
+services:
+  #server
+  - type: web
+    name: dust-server
+    runtime: docker
+    plan: free
+    region: frankfurt
+    startCommand: python server.py
+    envVars:
+      - key: PORT
+        sync: false
+    autoDeploy: true
+
+#client
+  - type: web
+    name: dust-client
+    runtime: docker
+    plan: free
+    region: frankfurt
+    startCommand: flet run main.py --web --port $PORT --host 0.0.0.0
+    envVars:
+      - key: PORT
+        sync: false
+      - key: RENDER
+        value: "true"
+      - key: SERVER_HOST
+        fromService:
+          type: web
+          name: dust-server
+          property: host
+      - key: SERVER_PORT
+        value: "443"
