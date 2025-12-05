@@ -5,7 +5,7 @@ services:
     plan: free
     region: frankfurt
     buildCommand: pip install poetry && poetry install
-    startCommand: poetry run python server.py
+    startCommand: poetry run python ./server/server.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.5
