@@ -10,6 +10,7 @@ python = ">=3.11,<3.14"
 poetry-core = "^2.2.1"
 pandas = "^2.3.3"
 flet = "^0.28.3"
+websockets = "*"
 
 
 [build-system]
