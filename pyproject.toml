@@ -1,9 +1,10 @@
 [tool.poetry]
 name = "dust-access-simulator"
 version = "0.0.1"
-description = "A Simulator for the game Dust Access"
+description = "A Simulator for the ECG game Dust Access"
 authors = ["Maria Vicidomini <a.vicidomini36@studenti.unisa.it>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"
