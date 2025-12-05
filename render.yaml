@@ -1,34 +1,39 @@
 services:
+  # SERVER
   - type: web
     name: dust-server
     runtime: python
     plan: free
     region: frankfurt
-    buildCommand: pip install poetry && poetry install
-    startCommand: poetry run python ./server/server.py
+    buildCommand: pip install -r requirements.txt
+
+    startCommand: python server/server.py
+
     envVars:
       - key: PYTHON_VERSION
-        value: 3.13.5
+        value: 3.11.9
       - key: PORT
         sync: false
+      - key: PYTHONPATH
+        value: "."
+
     autoDeploy: true
 
-  # 2. Client
+  # CLIENT WEB
   - type: web
     name: dust-client
     runtime: python
     plan: free
     region: frankfurt
-    buildCommand: pip install poetry && poetry install
-    startCommand: poetry run python main.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.13.5
+        value: 3.11.9
       - key: PORT
         sync: false
       - key: RENDER
         value: "true"
-      # Auto-discovery del server
       - key: SERVER_HOST
         fromService:
           type: web
