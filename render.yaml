@@ -1,28 +1,39 @@
 services:
-  #server
+  # 1. IL SERVER DI GIOCO (WebSocket)
   - type: web
     name: dust-server
-    runtime: docker
+    runtime: python
     plan: free
     region: frankfurt
-    dockerCommand: python ./server/server.py
+    # Comandi per installare Poetry e le dipendenze
+    buildCommand: pip install poetry && poetry install
+    # Comando di avvio
+    startCommand: poetry run python server.py
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9 # Forziamo una versione stabile
       - key: PORT
         sync: false
     autoDeploy: true
 
-#client
+  # 2. IL CLIENT WEB (Flet)
   - type: web
     name: dust-client
-    runtime: docker
+    runtime: python
     plan: free
     region: frankfurt
-    dockerCommand: python main.py
+    # Stesso comando di build
+    buildCommand: pip install poetry && poetry install
+    # Comando di avvio
+    startCommand: poetry run python main.py
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: PORT
         sync: false
       - key: RENDER
         value: "true"
+      # Auto-discovery del server
       - key: SERVER_HOST
         fromService:
           type: web
