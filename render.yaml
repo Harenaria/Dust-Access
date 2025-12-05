@@ -17,7 +17,7 @@ services:
     runtime: docker
     plan: free
     region: frankfurt
-    dockerCommand: flet run main.py --web --port $PORT --host 0.0.0.0
+    dockerCommand: python main.py
     envVars:
       - key: PORT
         sync: false
