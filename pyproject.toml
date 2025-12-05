@@ -6,7 +6,7 @@ authors = ["Maria Vicidomini <a.vicidomini36@studenti.unisa.it>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.11,<3.14"
 poetry-core = "^2.2.1"
 pandas = "^2.3.3"
 flet = "^0.28.3"
