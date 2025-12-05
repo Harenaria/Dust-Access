@@ -1,12 +1,23 @@
 import flet as ft
 import os
+import logging
+
+# ... (I tuoi import: LobbyView, GameView, GameClient) ...
 from client.webclient.lobby_view import LobbyView
 from client.webclient.game_view import GameView
 from client.client import GameClient
 
+# Configurazione Log per vedere cosa succede su Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("FletApp")
+
+
 def main(page: ft.Page):
     page.title = "Dust Access Simulator"
-    page.theme_mode = ft.ThemeMode.DARK # Forza dark mode
+    page.theme_mode = ft.ThemeMode.DARK
+    page.padding = 0
+
+    # Inizializza il client
     client = GameClient()
 
     def route_change(route):
@@ -28,12 +39,25 @@ def main(page: ft.Page):
 
 
 def client_runner():
-    port = int(os.environ.get("PORT", 8550))
+    # --- CONFIGURAZIONE DI RETE CRITICA PER RENDER ---
 
-    host = "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1"
+    # 1. Recupera la PORTA fornita da Render (default 8080 per locale)
+    server_port = int(os.environ.get("PORT", 8080))
 
-    print(f"Avvio Flet Client su http://{host}:{port}")
-    ft.app(target=main, view=ft.WEB_BROWSER, port=port, host=host)
+    # 2. Imposta l'HOST.
+    # SU RENDER DEVE ESSERE "0.0.0.0".
+    # In locale va bene anche "127.0.0.1".
+    server_host = "0.0.0.0"
+
+    logger.info(f"Avvio Flet Web App su {server_host}:{server_port}")
+
+    # 3. Avvia Flet
+    ft.app(
+        target=main,
+        view=ft.WEB_BROWSER,  # Fondamentale per la modalità web
+        port=server_port,
+        host=server_host
+    )
 
 
 if __name__ == "__main__":
