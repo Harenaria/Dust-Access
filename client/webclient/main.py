@@ -44,9 +44,6 @@ def client_runner():
     # 1. Recupera la PORTA fornita da Render (default 8080 per locale)
     server_port = int(os.environ.get("PORT", 8080))
 
-    # 2. Imposta l'HOST.
-    # SU RENDER DEVE ESSERE "0.0.0.0".
-    # In locale va bene anche "127.0.0.1".
     server_host = "0.0.0.0"
 
     logger.info(f"Avvio Flet Web App su {server_host}:{server_port}")

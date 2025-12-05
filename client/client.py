@@ -2,7 +2,6 @@ import pickle
 import threading
 import os
 import time
-import sys
 from urllib.parse import urlparse
 from websockets.sync.client import connect
 from websockets.exceptions import ConnectionClosed
@@ -10,32 +9,37 @@ from websockets.exceptions import ConnectionClosed
 
 class GameClient:
     def __init__(self):
-        # --- ROBUST URL CONSTRUCTION ---
+        # --- CONFIGURAZIONE ---
         self.raw_host = os.environ.get("SERVER_HOST", "127.0.0.1")
         self.port = os.environ.get("SERVER_PORT", "8080")
         self.is_render = os.environ.get("RENDER") is not None
 
-        # 1. Clean host
+        # 1. Pulizia Host
         host_str = self.raw_host
         if "://" in host_str:
             parsed = urlparse(host_str)
-            host_str = parsed.netloc  # Extracts "dust-server.onrender.com"
+            host_str = parsed.netloc
 
-        # 2. Protocol
-        protocol = "wss" if self.is_render else "ws"
+        # 2. FIX RENDER: Se l'host è uno slug interno (es. "dust-server-q41v")
+        # e siamo su Render, aggiungiamo il dominio pubblico.
+        if self.is_render and "." not in host_str and "localhost" not in host_str:
+            host_str = f"{host_str}.onrender.com"
 
-        # 3. Port (Only add if not standard 80/443 and not implied by Render URL)
-        # On Render, SERVER_HOST via fromService usually has no port, but mapped to 443
-        port_str = ""
-        if not self.is_render:
+        # 3. Determina Protocollo in base alla Porta/Ambiente
+        # Se la porta è 443 (default Render pubblico), usa WSS.
+        if self.port == "443" or self.is_render:
+            protocol = "wss"
+            port_str = ""  # Porta 443 implicita
+        else:
+            protocol = "ws"
             port_str = f":{self.port}"
 
-        # 4. Final URI (Must point to /ws)
+        # 4. URI Finale
         self.uri = f"{protocol}://{host_str}{port_str}/ws"
 
         print(f"--- CLIENT CONFIG ---")
-        print(f"Target URI: {self.uri}")
-        print(f"Render Mode: {self.is_render}")
+        print(f"Raw Host: {self.raw_host}")
+        print(f"Final URI: {self.uri}")
         print(f"---------------------")
 
         self.ws = None
@@ -44,15 +48,15 @@ class GameClient:
         self.player_name = "Player"
 
     def connect(self):
-        print(f"[Client] Attempting connection to {self.uri}...")
-        for i in range(5):  # 5 attempts
+        print(f"[Client] Connecting to {self.uri}...")
+        # Retry più aggressivi per gestire lo 'sleep' dei server free
+        for i in range(10):
             try:
-                # Increased timeout for slow cold starts
                 self.ws = connect(self.uri, open_timeout=20, close_timeout=10)
                 print("[Client] Connection ESTABLISHED!")
                 return True
             except Exception as e:
-                print(f"[Client] Connection attempt {i + 1} failed: {e}")
+                print(f"[Client] Attempt {i + 1}/10 failed: {e}")
                 time.sleep(2)
 
         print("[Client] FATAL: Could not connect to server.")
@@ -89,7 +93,7 @@ class GameClient:
             print(f"[Client] Receive Error: {e}")
             return None
 
-    # --- Methods ---
+    # --- LOBBY METHODS ---
     def wait_for_player_id(self):
         return self.receive_data()
 
@@ -105,6 +109,7 @@ class GameClient:
     def send_spec_selection(self, spec, name):
         self._send_data({'spec': spec, 'name': name})
 
+    # --- GAME METHODS ---
     def fetch_game_state(self):
         return self.receive_data()
 
