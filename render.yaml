@@ -5,7 +5,7 @@ services:
     runtime: docker
     plan: free
     region: frankfurt
-    dockerCommand: python server.py
+    dockerCommand: python ./server/server.py
     envVars:
       - key: PORT
         sync: false
