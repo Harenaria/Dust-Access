@@ -1,11 +1,19 @@
 import asyncio
-import http
 import pickle
 import os
+import logging
 import pandas as pd
-import websockets
+from aiohttp import web, WSMsgType
 from core.deck import validate_deck, get_deck_specializations
 from core.enums import Winner, Phases
+
+# --- CONFIGURAZIONE LOGGING ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger("DustServer")
 
 
 # --- HELPER FUNCTIONS ---
@@ -16,7 +24,7 @@ def get_available_specializations(deck_id=None):
     try:
         df = pd.read_csv("./data/Specializations.csv")
         return df[df['isBase'] == 1]['Name'].tolist()
-    except:
+    except Exception:
         return ["Scraper", "Crawler", "Querist"]
 
 
@@ -34,223 +42,262 @@ def get_available_decks():
 
 
 class ClientDisconnected(Exception):
+    """Eccezione custom per gestire la disconnessione pulita"""
     pass
 
 
-async def health_check(connection, request):
-    """
-    To use with Render to avoid breaking the server when receiving the required health checks.
-    """
-    if request.path == "/":
-        # 200 OK response
-        return connection.respond(http.HTTPStatus.OK, "Dust Server is Running")
-
-    # Nothing to do here: it was not the health check request
-    return None
-
-
-class DustServer:
+class GameServer:
     def __init__(self):
-        self.clients = [None, None]
-        self.player_data = [None, None]
-        self.connected_event = asyncio.Event()  # To signal when 2 players are ready
+        self.clients = [None, None]  # Slot P1 e P2 (WebSocketResponse)
+        self.player_data = [None, None]  # Dati Lobby
+        self.connected_event = asyncio.Event()  # Segnale "Tutti Pronti"
+        self.game_task = None  # Riferimento al task della partita
 
-    async def run(self):
-        port = int(os.environ.get("PORT", 8080))
-        print(f"[*] WebSocket Server listening on 0.0.0.0:{port}")
+    async def health_check(self, request):
+        """Risponde al ping di Render/Uptime robot"""
+        return web.Response(text="Dust Access Server: Online", status=200)
 
-        # Start the WebSocket server
-        async with websockets.serve(self.handler, "0.0.0.0", port, process_request=health_check):
-            await asyncio.Future()  # Run forever
+    async def websocket_handler(self, request):
+        """Gestisce l'upgrade e il ciclo di vita della connessione WebSocket"""
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
 
-    async def handler(self, websocket):
-        """Handle new connections"""
+        # Assegnazione Slot (0 o 1)
         if self.clients[0] is None:
-            player_id = 0
+            pid = 0
         elif self.clients[1] is None:
-            player_id = 1
+            pid = 1
         else:
-            await websocket.close()  # Room full
-            return
+            await ws.close(code=4000, message=b"Room Full")
+            return ws
 
-        print(f"[+] P{player_id + 1} connected")
-        self.clients[player_id] = websocket
+        self.clients[pid] = ws
+        logger.info(f"Player {pid + 1} connected from {request.remote}")
 
         try:
-            # 1. Handshake
-            await self.raw_send(player_id, player_id)
-            await self.raw_send(player_id, {'decks': get_available_decks()})
+            # 1. Handshake & Lobby
+            await self.run_lobby_phase(pid)
 
-            # 2. Lobby Selection
-            await self.handle_lobby_selection(player_id)
-
-            # Wait for both to be ready
-            if player_id == 0:
-                print("[*] P1 Ready, waiting for P2...")
+            # 2. Sincronizzazione
+            if pid == 0:
+                logger.info("P1 Waiting for P2...")
                 await self.connected_event.wait()
             else:
-                print("[*] P2 Ready, starting game...")
+                logger.info("P2 Joined. Starting Game...")
                 self.connected_event.set()
 
-            # 3. Game Loop (Only ran by P1 task logically, or shared?)
-            # Actually, with asyncio, we can run the game manager in a separate task
-            # once both are ready.
-            if player_id == 1:  # Trigger game start when P2 joins
-                asyncio.create_task(self.game_man())
+            # 3. Avvio Logica di Gioco (Singleton)
+            if pid == 1:
+                # Avvia il manager in background
+                self.game_task = asyncio.create_task(self.game_manager())
 
-            # Keep connection alive while game_man runs elsewhere
-            # We need to keep this handler open to receive messages?
-            # Ideally, game_man handles recv via self.recv_from
-            # So we just wait here until closed.
-            await websocket.wait_closed()
+            # 4. Keep-Alive Loop
+            # In aiohttp, il handler deve rimanere vivo finché la connessione è aperta.
+            # I messaggi di gioco vengono letti "a richiesta" dentro game_manager tramite self.recv_from,
+            # ma qui dobbiamo gestire il ciclo principale di lettura per non chiudere il socket.
+            # Tuttavia, poiché game_manager è un task separato che chiama recv_from,
+            # dobbiamo evitare che questo loop "rubi" i messaggi.
+            # TRUCCO: In questa architettura semplice, game_manager consumerà i messaggi.
+            #         Qui ci mettiamo solo in attesa della chiusura.
 
+            # Attendiamo che il socket si chiuda
+            await ws.wait_closed()
+
+        except ClientDisconnected:
+            logger.warning(f"Player {pid + 1} disconnected cleanly during setup.")
         except Exception as e:
-            print(f"[!] Error/Disconnect P{player_id + 1}: {e}")
+            logger.error(f"Unexpected error for P{pid + 1}: {e}", exc_info=True)
         finally:
-            self.clients[player_id] = None
-            print(f"[-] P{player_id + 1} disconnected")
+            logger.info(f"Player {pid + 1} session ended.")
+            self.clients[pid] = None
+            # Se un giocatore esce, la partita è compromessa.
+            # In un server reale resetteremmo la stanza, qui lasciamo terminare il processo.
+            if self.game_task: self.game_task.cancel()
+
+        return ws
+
+    # --- COMUNICAZIONE ---
 
     async def raw_send(self, pid, data):
+        """Invia dati serializzati al client specificato"""
         ws = self.clients[pid]
-        if not ws: raise ClientDisconnected(pid)
+        if ws is None or ws.closed:
+            raise ClientDisconnected(pid)
         try:
-            await ws.send(pickle.dumps(data))
-        except:
+            await ws.send_bytes(pickle.dumps(data))
+        except Exception:
             raise ClientDisconnected(pid)
 
     async def recv_from(self, pid):
+        """
+        Legge il prossimo messaggio dal client specifico.
+        Questa funzione è chiamata dal Game Manager.
+        """
         ws = self.clients[pid]
-        if not ws: raise ClientDisconnected(pid)
-        try:
-            data = await ws.recv()
-            return pickle.loads(data)
-        except:
+        if ws is None or ws.closed:
             raise ClientDisconnected(pid)
 
-    async def handle_lobby_selection(self, player_id):
-        # Deck
+        try:
+            # receive() restituisce il prossimo messaggio dalla coda interna di aiohttp
+            msg = await ws.receive()
+
+            if msg.type == WSMsgType.BINARY:
+                return pickle.loads(msg.data)
+            elif msg.type == WSMsgType.CLOSE:
+                raise ClientDisconnected(pid)
+            elif msg.type == WSMsgType.ERROR:
+                logger.error(f"WS Error P{pid + 1}: {ws.exception()}")
+                raise ClientDisconnected(pid)
+            else:
+                return None  # Ignora ping/pong o text frame non previsti
+        except Exception:
+            raise ClientDisconnected(pid)
+
+    # --- LOGICA LOBBY ---
+
+    async def run_lobby_phase(self, pid):
+        # Send ID & Decks
+        await self.raw_send(pid, pid)
+        await self.raw_send(pid, {'decks': get_available_decks()})
+
+        # Deck Selection Loop
         deck_id = None
         while deck_id is None:
-            msg = await self.recv_from(player_id)
+            msg = await self.recv_from(pid)
             d_id = msg.get('deck_id')
+
             if d_id not in get_available_decks():
-                await self.raw_send(player_id, {"valid": False, "error": "Invalid Deck", "step": "deck"})
+                await self.raw_send(pid, {"valid": False, "error": "Invalid Deck", "step": "deck"})
                 continue
+
             valid, err = validate_deck(d_id)
             if not valid:
-                await self.raw_send(player_id, {"valid": False, "error": err, "step": "deck"})
+                await self.raw_send(pid, {"valid": False, "error": err, "step": "deck"})
                 continue
+
             deck_id = d_id
-            await self.raw_send(player_id, {"valid": True, "step": "deck",
-                                            "specializations": get_available_specializations(deck_id)})
+            await self.raw_send(pid, {"valid": True, "step": "deck",
+                                      "specializations": get_available_specializations(deck_id)})
 
-        # Spec
+        # Spec Selection Loop
         while True:
-            msg = await self.recv_from(player_id)
+            msg = await self.recv_from(pid)
             spec = msg.get('spec')
-            name = msg.get('name', f"P{player_id + 1}")
+            name = msg.get('name', f"Player {pid + 1}")
+
             if spec not in get_available_specializations(deck_id):
-                await self.raw_send(player_id, {"valid": False, "error": "Invalid Spec", "step": "spec"})
+                await self.raw_send(pid, {"valid": False, "error": "Invalid Spec", "step": "spec"})
                 continue
 
-            self.player_data[player_id] = {'name': name, 'deck_id': deck_id, 'spec': spec}
-            await self.raw_send(player_id, {"valid": True, "step": "complete"})
+            self.player_data[pid] = {'name': name, 'deck_id': deck_id, 'spec': spec}
+            await self.raw_send(pid, {"valid": True, "step": "complete"})
 
-            # Wait for other player data
-            other_id = 1 - player_id
-            if not self.player_data[other_id]:
-                await self.raw_send(player_id, {"status": "waiting"})
-                while not self.player_data[other_id]:
-                    await asyncio.sleep(0.1)
+            # Sync Wait for Opponent
+            other_pid = 1 - pid
+            if self.player_data[other_pid] is None:
+                await self.raw_send(pid, {"status": "waiting"})
+                while self.player_data[other_pid] is None:
+                    await asyncio.sleep(0.2)
 
-            await self.raw_send(player_id, {"status": "ready"})
+            await self.raw_send(pid, {"status": "ready"})
             break
+
+    # --- LOGICA PARTITA ---
+
+    async def broadcast_state(self, game):
+        """Invia lo stato sanificato a entrambi i giocatori"""
+        for i in [0, 1]:
+            try:
+                state = self.sanitize_state(game, i)
+                await self.raw_send(i, state)
+            except ClientDisconnected:
+                pass  # Gestito dal loop principale
 
     @staticmethod
     def sanitize_state(real_game, player_idx_to_send_to):
         import copy
-        game_view = copy.deepcopy(real_game)
-        opponent_idx = 1 - player_idx_to_send_to
-        for card in game_view.players[opponent_idx].hand:
+        view = copy.deepcopy(real_game)
+        opp_idx = 1 - player_idx_to_send_to
+        for card in view.players[opp_idx].hand:
             card.name = "Covered"
             card.Text = "?"
             card.PowerIncrease = 0
             if not hasattr(card, 'CD'): card.CD = 0
-        return game_view
+        return view
 
-    async def game_man(self):
+    async def game_manager(self):
         from core.game import matchCreator
 
-        print("[*] Initializing Match...")
+        logger.info("Initializing Game Engine...")
         p1, p2 = self.player_data
         game = matchCreator(p1['name'], p1['deck_id'], p1['spec'], p2['name'], p2['deck_id'], p2['spec'])
-        game.nextPhase()
 
-        # Send initial state
+        # Start
+        game.nextPhase()
         await self.broadcast_state(game)
 
         while True:
             try:
-                from core.enums import Phases
-
-                # Check winner
+                # 1. Check Win Condition
                 if game.winner != Winner.NONE:
-                    print(f"[*] WINNER: {game.winner.name}")
+                    logger.info(f"GAME OVER. Winner: {game.winner.name}")
                     await self.broadcast_state(game)
                     break
 
-                # Auto Phase
+                # 2. Auto Phases (Start/Loot)
                 if game.phase in [Phases.START, Phases.LOOT]:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.5)  # Ritardo estetico
                     game.nextPhase()
                     await self.broadcast_state(game)
                     continue
 
-                # Wait for Action
-                active = game.isPlaying
+                # 3. Wait for Input
+                active_pid = game.isPlaying
+
+                # Timeout di sicurezza (10 min) per non bloccare risorse zombie
                 try:
-                    # Async wait for input
-                    action_dict = await asyncio.wait_for(self.recv_from(active), timeout=600)  # 10 min timeout
+                    action_data = await asyncio.wait_for(self.recv_from(active_pid), timeout=600.0)
                 except asyncio.TimeoutError:
-                    print(f"[!] Timeout P{active}")
-                    game.winner = Winner(1 - active + 1)
+                    logger.warning(f"Timeout for Player {active_pid + 1}")
+                    game.winner = Winner(1 - active_pid + 1)
                     continue
 
-                print(f"[*] P{active + 1} -> {action_dict['action'].name}")
-                res = game.receiveAction(active, action_dict['action'], action_dict['args'])
+                # 4. Process Action
+                logger.info(f"Action from P{active_pid + 1}: {action_data['action'].name}")
+                result = game.receiveAction(active_pid, action_data['action'], action_data['args'])
 
-                # Send result to active player
-                await self.raw_send(active, res)
-
-                # Broadcast updated state to both
+                # 5. Feedback
+                await self.raw_send(active_pid, result)
                 await self.broadcast_state(game)
 
             except ClientDisconnected as e:
-                dropout = e.args[0]
-                print(f"[!] P{dropout + 1} Left")
-                game.winner = Winner(1 - dropout + 1)
-                await self.broadcast_state(game)  # Notify remaining
+                # Vittoria a tavolino
+                loser = e.args[0]
+                logger.info(f"Player {loser + 1} surrendered (disconnected).")
+                game.winner = Winner(1 - loser + 1)
+                await self.broadcast_state(game)
                 break
             except Exception as e:
-                print(f"[!] Critical Game Error: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.critical(f"Game Logic Crash: {e}", exc_info=True)
                 break
 
-        print("[*] Match Ended.")
-        # Optional: Close connections or reset
+        logger.info("Match finished.")
 
-    async def broadcast_state(self, game):
-        try:
-            await self.raw_send(0, self.sanitize_state(game, 0))
-        except:
-            pass
-        try:
-            await self.raw_send(1, self.sanitize_state(game, 1))
-        except:
-            pass
+
+# --- ENTRY POINT ---
+
+async def init_app():
+    server = GameServer()
+    app = web.Application()
+
+    # Rotte
+    app.router.add_get('/', server.health_check)  # HTTP
+    app.router.add_get('/ws', server.websocket_handler)  # WebSocket
+
+    return app
 
 
 if __name__ == "__main__":
-    server = DustServer()
-    asyncio.run(server.run())
+    port = int(os.environ.get("PORT", 8080))
+    # Aiohttp entry point
+    web.run_app(init_app(), port=port)
