@@ -1,0 +1,117 @@
+Name,Class,Type,is2Handed,Level,DurabilityIncrease,PowerIncrease,EfficiencyIncrease,TenacityIncrease,SensitivityIncrease,AtkStat,AtkFunc,AtkCoeff,OnHit,OnMiss,OnPlay,OnActivate,OnNextTurn,OnNextPlayerTurn,OnRemove,WhileinPlay,ChainsWith,OnChainActivate,Text,CD,Flavor,in_deck
+Blunt Club,Heavy,Weapon,0,1,,2,,,,Power,LINEAR,-1,"playCounter(""Rage"", 1)","removeAllCounters(""Rage"")",,,,,,,,,"Power +2
+
+1. Attack: Deal damage equal to Power-1 to an enemy.
+   - It hits -> Gain a Rage counter
+   - It misses -> Lose all Rage counters
+
+Rage counter: While in play, Power +1",0,"Probably part of an ancient ritual.
+You feel a latent power now getting dull.",2
+Large Club,Heavy,Dual,1,1,,3,,,,Power,LINEAR,-1,"playCounter(""Rage"", 1)","removeAllCounters(""Rage"")",,,,,,,,,"Power +3
+This weapon is Two Handed.
+
+1. Attack: Deal damage equal to Power-1 to an enemy.
+   - It hits -> Gain a Rage token
+   - It misses -> Lose all Rage tokens
+
+Rage token: While in play, Power +1",1,"When the ancient tree withered and died, Jargen used its wood to build this club. This was the beginning of its legend.",1
+Gladius,Heavy,Weapon,0,1,,2,,,,Power,LINEAR,0,,,,,,,,,,,"Power +2
+
+1. Attack: Deal damage equal to Power to an enemy.",0,This blade has been passed from old to new gladiators as a memento mori.,1
+Mercenary Longsword,Heavy,Weapon,0,3,,3,,1,,Power,LINEAR,0,,,,,,,,,,,"Power +3
+Tenacity +1
+
+1. Attack: Deal damage equal to Power to an enemy.",0,The Band of the Red Ox used this sword as the tombstone of their leader.,2
+Sword of the Saint,Heavy,Weapon,0,5,,4,,2,,Power,LINEAR,0,,,,Kai(),,,,,,,"Power +4
+Tenacity +2
+1. Attack: Deal damage equal to Power to an enemy.
+2. Skill - Kai: the next 3 Skills you use that deal damage to an enemy deal damage equal to Power instead of their regular value. You cannot wear off-hand equip to use this",0,"The Saint, a mysterious swordman, fought their whole life dueling using this sword.
+When they lost both their arms, the legend tells that this sword was attached to their right arm prothesis.",1
+Wooden Shield,Heavy,Off-Hand,,1,,,,1,,,,,,,,Cover(2),,,,,,,"Tenacity +1
+
+1. Skill - Cover II: Gain Tenacity +2 until your next turn.",2,"When Julia was attacked by a drunk mercenary, she defended herself with the tavern's table and punched him until he was sober. It marked the start of a great friendship.",2
+Kite Shield,Heavy,Off-Hand,,3,,,,2,,,,,,,,,,,,,,,"Tenacity +2
+
+1. Skil - Shield: Until your next turn, the first damage Action you are the target of misses.",2,"Julia, acting commander of the Band of the Red Ox after her lover's death, swore to his tomb that she'll keep everyone else alive in his absence.",2
+Tower Shield,Heavy,Off-Hand,,5,,,,3,,,,,,,,Cover(5),,,,,,,"Tenacity +3
+
+1. Skill - Cover V: Gain Tenacity +5 until your next turn.",3,"The shield of Julia, known as the Iron Angel, the Valkyrie or the Shieldmaiden based on the song you hear. She kept fighting and defending soldiers on the battlefield even after the Band of The Red Ox was disbanded.",2
+Father's Billhook,Heavy,Dual,1,1,,1,,1,,Power,LINEAR,0,,,,Deflect(1),,,,,,,"Power +2
+Tenacity +1
+This weapon is considered Two Handed.
+
+1. Attack: Deal damage equal to Power to an enemy.
+2. Skill - Deflect I: Until your next turn, Tenacity +1 during the first damage Action you are the target of.
+ - if it misses -> gain a Momentum token. You lose it at the end of your next turn.
+
+Momentum token: You can remove it from game to make a learnt Skill ready.",1,"After the farm burned down, a young man that lost everything clinged to this weapon like it was the family he didn't have anymore.",1
+The Hero's Polearm,Heavy,Dual,1,3,,1,,3,,Power,LINEAR,2,,,,Deflect(1),,,,,,,"Power +1
+Tenacity +3
+This weapon is considered Two Handed.
+
+1. Attack: Deal damage equal to Power+2 to an enemy.
+2. Skill - Deflect I: Until your next turn, Tenacity +1 during the first damage Action you are the target of.
+ - if it misses -> gain a Momentum token. You lose it at the end of your next turn.
+
+Momentum token: You can remove it from game to make a learnt Skill ready.",1,"The towns of Queensdale still remember of a folk hero that fought with a farming tool and that one day disappeared.,
+He's treated as the guardian angel of all children, expecially orphans.",2
+The Bloody Claw,Heavy,Dual,1,5,,4,,3,,Power,LINEAR,2,,,,Deflect(1),,,,,,,"Power +4
+Tenacity +3
+This weapon is considered Two Handed.
+
+1. Attack: Deal damage equal to Power+2 to an enemy.
+2. Skill - Deflect I: Until your next turn, Tenacity +1 during the first damage Action you are the target of.
+ - if it misses -> gain a Momentum token. You lose it at the end of your next turn.
+
+Momentum token: You can remove it from game to make a learnt Skill ready.",1,"A crazy cannibal lives in the forest near Queensdale and attacks people on sight. His weapon is a twisted and rusted billhook, always drenched in blood.",2
+Devious Eyepatch,Heavy,Head,,1,,2,,,,,,,,,,,,,,,,,Power +2,,,2
+Trusty Helmet,Heavy,Head,,3,,,,1,,,,,,,,,,,,,,,Tenacity +1,,,2
+Shirt of Bravado,Heavy,Chest,,2,,4,,1,,,,,,,,,,,,,,,"Power +4
+Tenacity +1",,,2
+Trusty Brigandine,Heavy,Chest,,3,,2,,3,,,,,,,,,,,,,,,"Power +2
+Tenacity +3",,,2
+Brave Bracers,Heavy,Bracers,,2,,,,1,,,,,,,,,,,,"gainXY_if_notZ_onField(""Tenacity"", 1, ""OFF_HAND"")",,,"
+Tenacity +1
+
+- Gain Tenacity +1 while you have no Off-Hand Equip on field.",,,2
+Caligae,Heavy,Boots,,2,,1,,,,,,,,,,,,,,"gainXY_if_notZ_onField(""Tenacity"", 1, ""DUAL"")",,,"
+Power +1
+
+- Gain Power +1 while you have no Dual Weapon on field.",,,2
+Valor Sallet,Heavy,Head,,5,,1,,1,,,,,,,,,,,,"checkEquipSet(""Valor"")",,,"Power +1
+Tenacity +1
+
+- If Head, Chest, Bracers and Boots on field have all ""Valor"" in their name: Power +2",,,2
+Valor Half-Plate,Heavy,Chest,,5,,3,,3,,,,,,,,,,,,,,,"Power +3
+Tenacity +3
+
+- If Head, Chest, Bracers and Boots on field have all ""Valor"" in their name: Power +2",,,2
+Valor Gauntlets,Heavy,Bracers,,5,,1,,1,,,,,,,,,,,,,,,"Power +1
+Tenacity +1
+
+- If Head, Chest, Bracers and Boots on field have all ""Valor"" in their name: Power +2",,,2
+Valor Leg Guards,Heavy,Boots,,5,,1,,1,,,,,,,,,,,,,,,"Power +1
+Tenacity +1
+
+- If Head, Chest, Bracers and Boots on field have all ""Valor"" in their name: Power +2",,,2
+Steel Slash,Heavy,Skill,,2,,,,,,,,,,,,"Damage(Efficiency,LINEAR,1)",,,,,,,"Deal Efficiency+1 damage to a target enemy.
+
+Chain [Brave Blade]",0,,2
+Brave Blade,Heavy,Skill,,4,,,,,,,,,,,,"Damage(Efficiency,LINEAR,2)",,,,,,,"Deal Efficiency+2 damage to a target enemy.
+
+Chain [Lacerating Lunge]",1,,2
+Lacerating Lunge,Heavy,Skill,,5,,,,,,,,,,,,"Damage(Efficiency,LINEAR,3)",,,,,,"Damage(Power,LINEAR,0)","If it was Chained: Deal Power damage to a target enemy.
+
+If it was not Chained: Deal Efficiency+3 damage to a target enemy.",1,,1
+Moon Cleave,Heavy,Skill,,2,,,,,,,,,,,,"Damage(Efficiency,LINEAR,0)",,,,,,,Deal Efficiency damage to all enemies.,0,"The legend says that when the Saint fenced with their enemies, their sword shone bright like a silver moon in a dark night.",1
+Shield Bash,Heavy,Skill,,3,,,,,,,,,,,,,,NullifyFirstAction(),,,,,"During your target enemy's next turn:
+The first time they use an Action, it has no effect.
+(A off-hand card has to be in play for this card to be in effect)",2,,2
+Furious Fencing,Heavy,Instant,,5,,,,,,,,,,,,"Damage(Efficiency,LINEAR,5)",,,,,,,Deal Efficiency+5 damage to a target enemy,3,,2
+Second Wind,Heavy,Cantrip,,1,,,,,,,,,,,,"Heal(Empathy,LINEAR,0)",,,,,,,Restore HP to your Accessor of a number of points equal to their Empathy,,,2
+Reckless Push,Heavy,Cantrip,,3,,,,,,,,,,,,ifUsedBonusRegain(),,,,,,,"If you already used your Bonus Action, gain one more.",,,2
+Battlemaster,Heavy,Instant,,2,,,,,,,,,,,,Battlemaster(),,,,,,,"Choose one effect. It is active until the end of the turn you activated this skill:
+1. Power +2
+2. Tenacity +5",3,,3
+Reload,Heavy,Cantrip,,2,,,,,,,,,,,,DrawThenDiscard(1),,,,,,,"Draw a card, then discard a card in your hand.",,,3
+Skullsplitter,Heavy,Skill,,5,,,,,,,,,,,,SkullSplitter(),,,,,,,"If you have a Heavy weapon equipped, deal Power damage and make your enemy incapable of using Bonus Actions during their first turn.",5,,2

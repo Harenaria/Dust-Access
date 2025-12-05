@@ -1,0 +1,4 @@
+Name,isBase,Class,Durability,Power,Efficiency,Tenacity,Sensitivity
+Scraper,1,Heavy,30,5,2,5,1
+Crawler,1,Medium,25,4,4,3,2
+Querist,1,Light,20,2,6,2,5
