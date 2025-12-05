@@ -2,34 +2,41 @@ import pickle
 import threading
 import os
 import time
+import sys
+from urllib.parse import urlparse
 from websockets.sync.client import connect
 from websockets.exceptions import ConnectionClosed
 
 
 class GameClient:
     def __init__(self):
-        # 1. Recupera Configurazione
+        # --- ROBUST URL CONSTRUCTION ---
         self.raw_host = os.environ.get("SERVER_HOST", "127.0.0.1")
         self.port = os.environ.get("SERVER_PORT", "8080")
-        self.is_render = bool(os.environ.get("RENDER"))
+        self.is_render = os.environ.get("RENDER") is not None
 
-        # 2. Costruisci Base URI (gestisce sia IP locale che URL Render)
-        if "://" in self.raw_host:
-            # Se SERVER_HOST è un URL completo (es. https://myapp.onrender.com)
-            base_uri = self.raw_host.replace("http://", "").replace("https://", "").replace("ws://", "").replace(
-                "wss://", "")
-            # Rimuovi trailing slash
-            if base_uri.endswith("/"): base_uri = base_uri[:-1]
-        else:
-            base_uri = f"{self.raw_host}:{self.port}"
+        # 1. Clean host
+        host_str = self.raw_host
+        if "://" in host_str:
+            parsed = urlparse(host_str)
+            host_str = parsed.netloc  # Extracts "dust-server.onrender.com"
 
-        # 3. Determina Protocollo
+        # 2. Protocol
         protocol = "wss" if self.is_render else "ws"
 
-        # 4. URI Finale (punta a /ws come definito nel server aiohttp)
-        self.uri = f"{protocol}://{base_uri}/ws"
+        # 3. Port (Only add if not standard 80/443 and not implied by Render URL)
+        # On Render, SERVER_HOST via fromService usually has no port, but mapped to 443
+        port_str = ""
+        if not self.is_render:
+            port_str = f":{self.port}"
 
-        print(f"[Client] Target Server: {self.uri}")
+        # 4. Final URI (Must point to /ws)
+        self.uri = f"{protocol}://{host_str}{port_str}/ws"
+
+        print(f"--- CLIENT CONFIG ---")
+        print(f"Target URI: {self.uri}")
+        print(f"Render Mode: {self.is_render}")
+        print(f"---------------------")
 
         self.ws = None
         self.my_id = None
@@ -37,16 +44,18 @@ class GameClient:
         self.player_name = "Player"
 
     def connect(self):
-        """Tenta la connessione con retry automatico (utile per spin-up cold start)"""
-        max_retries = 3
-        for i in range(max_retries):
+        print(f"[Client] Attempting connection to {self.uri}...")
+        for i in range(5):  # 5 attempts
             try:
-                self.ws = connect(self.uri, open_timeout=10)  # 10s timeout
-                print("[Client] Connected successfully.")
+                # Increased timeout for slow cold starts
+                self.ws = connect(self.uri, open_timeout=20, close_timeout=10)
+                print("[Client] Connection ESTABLISHED!")
                 return True
             except Exception as e:
                 print(f"[Client] Connection attempt {i + 1} failed: {e}")
-                time.sleep(1)
+                time.sleep(2)
+
+        print("[Client] FATAL: Could not connect to server.")
         return False
 
     def disconnect(self):
@@ -62,7 +71,6 @@ class GameClient:
         with self._lock:
             if not self.ws: return
             try:
-                # Invia dati binari (Pickle)
                 self.ws.send(pickle.dumps(data))
             except Exception as e:
                 print(f"[Client] Send Error: {e}")
@@ -71,7 +79,6 @@ class GameClient:
     def receive_data(self):
         if not self.ws: return None
         try:
-            # Websockets.sync gestisce il framing automaticamente
             data = self.ws.recv()
             return pickle.loads(data)
         except ConnectionClosed:
@@ -82,7 +89,7 @@ class GameClient:
             print(f"[Client] Receive Error: {e}")
             return None
 
-    # --- LOBBY METHODS ---
+    # --- Methods ---
     def wait_for_player_id(self):
         return self.receive_data()
 
@@ -98,7 +105,6 @@ class GameClient:
     def send_spec_selection(self, spec, name):
         self._send_data({'spec': spec, 'name': name})
 
-    # --- GAME METHODS ---
     def fetch_game_state(self):
         return self.receive_data()
 
