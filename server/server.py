@@ -1,4 +1,5 @@
 import asyncio
+import http
 import pickle
 import os
 import pandas as pd
@@ -36,6 +37,18 @@ class ClientDisconnected(Exception):
     pass
 
 
+async def health_check(connection, request):
+    """
+    To use with Render to avoid breaking the server when receiving the required health checks.
+    """
+    if request.path == "/":
+        # 200 OK response
+        return connection.respond(http.HTTPStatus.OK, "Dust Server is Running")
+
+    # Nothing to do here: it was not the health check request
+    return None
+
+
 class DustServer:
     def __init__(self):
         self.clients = [None, None]
@@ -47,7 +60,7 @@ class DustServer:
         print(f"[*] WebSocket Server listening on 0.0.0.0:{port}")
 
         # Start the WebSocket server
-        async with websockets.serve(self.handler, "0.0.0.0", port):
+        async with websockets.serve(self.handler, "0.0.0.0", port, process_request=health_check):
             await asyncio.Future()  # Run forever
 
     async def handler(self, websocket):

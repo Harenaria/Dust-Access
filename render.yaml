@@ -9,6 +9,8 @@ services:
 
     startCommand: python server/server.py
 
+    healthCheckPath: "/"
+
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.5
