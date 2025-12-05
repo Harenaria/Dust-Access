@@ -1,0 +1,25 @@
+import logging
+import sys
+import io
+import codecs
+
+original_getincrementaldecoder = codecs.getincrementaldecoder
+
+def new_getincrementaldecoder(encoding):
+    if encoding == 'utf-8':
+        return original_getincrementaldecoder(encoding)(errors='ignore')
+    return original_getincrementaldecoder(encoding)
+
+codecs.getincrementaldecoder = new_getincrementaldecoder
+
+from client.textual.tui import DustAccessTUI
+
+# --- LOGGING SETUP ---
+logging.basicConfig(filename="client_debug.log", level=logging.INFO)
+# Use binary mode with TextIOWrapper to handle both text and binary data
+sys.stdout = io.TextIOWrapper(open("debug.log", "wb"), encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(open("debug.log", "wb"), encoding='utf-8', errors='replace')
+
+if __name__ == "__main__":
+    app = DustAccessTUI()
+    app.run()

@@ -105,7 +105,7 @@ class Deck:
                     equip_df['SensitivityIncrease'].iloc[i],
                 ))
         for i in range(len(weapon_df)):
-            for n in range(weapon_df['in_deck'].iloc[i]):
+            for n in range(int(weapon_df['in_deck'].iloc[i])):
                 self.cards.append(card.WeaponCard(
                     weapon_df['Name'].iloc[i],
                     weapon_df['Text'].iloc[i],
@@ -136,7 +136,7 @@ class Deck:
         
         for i in range(len(skill_df)):
             isInstant = 1 if (skill_df['Type'].iloc[i] == "Instant") else 0
-            for n in range(skill_df['in_deck'].iloc[i]):
+            for n in range(int(skill_df['in_deck'].iloc[i])):
                 self.cards.append(card.SkillCard(
                     skill_df['Name'].iloc[i],
                     skill_df['Text'].iloc[i],
@@ -158,7 +158,7 @@ class Deck:
                     skill_df['OnMiss'].iloc[i]
                 ))
         for i in range(len(cantrip_df)):
-            for n in range(cantrip_df['in_deck'].iloc[i]):
+            for n in range(int(cantrip_df['in_deck'].iloc[i])):
                 self.cards.append(card.CantripCard(
                     cantrip_df['Name'].iloc[i],
                     cantrip_df['Text'].iloc[i],
