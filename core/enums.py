@@ -51,6 +51,7 @@ class Scaling(StrEnum):
     LINEAR = 'LINEAR'
     MULTIPLICATIVE = 'MULTIPLICATIVE'
 class Counter(StrEnum):
+    KAI = 'Kai'
     RAGE = 'Rage'
     MOMENTUM = 'Momentum'
 #---------------------------

@@ -89,8 +89,9 @@ Possono essere Base o Avanzate: A inizio partita si deve giocare una Specializza
 - **Potenza:** La potenza di fuoco del tuo Accessor. Influenza i danni delle armi e delle skill.
 - **Efficienza:** Un Accessor efficiente sarà capace di utilizzare al meglio le sue Abilità. Aumenta i danni o l'efficacia delle Skill.
 - **Sensitività:** Un Accessor sensitivo è dotato di un IA migliore. Aumenta la capacità di cura.
-- **Tenacia:** Diminuisce i danni subiti da Attacchi e Skill. **Nota:** Un attacco andato a segno infligge sempre un minimo di 1 danno, indipendentemente dalla Resistenza.
-
+- **Tenacia:** Il valore di armatura che viene sottratto direttamente dai danni in arrivo. 
+  - Se Danno - Tenacia > 0: Il colpo (attacco o skill) va a segno (Hit) e infligge danni agli HP.
+  - Altrimenti: Il colpo è parato/mancato (Blocked/Miss). Non vengono inflitti danni agli HP, ma si attivano eventuali effetti "On Miss" dell'attaccante.
 #### La classe delle Specializzazioni
 Un Accessor di **Classe Pesante** avrà le seguenti caratteristiche:
 - Alta Potenza e/o Tenacia.
@@ -133,16 +134,15 @@ Un turno si compone delle seguenti fasi:
    - Se hai raggiunto il Livello 5, puoi evolvere la tua Specializzazione.
 
 4. **Duel Phase**: In questa fase hai a disposizione due azioni indipendenti, utilizzabili in qualsiasi ordine: **1 Azione Tattica** e **1 Azione di Combattimento**.
-   
+
    **Azione Tattica (Scegline una):**
-   - Attivare una Skill pronta sul campo (poi va in ricarica).
-   - Attivare un Trucchetto dalla mano.
+   - Attivare una Skill o un instant skill pronta sul campo (poi va in ricarica).
    - Equipaggiare un oggetto dalla mano (o sostituirne uno esistente).
-   - *Se la Skill attivata ha una Chain valida, la seconda skill si attiva gratuitamente.*
+   - *Se la Skill attivata ha una Chain valida, la seconda skill può essere attivata gratuitamente.*
    
    **Azione di Combattimento:**
-   - Eseguire l'Attacco dell'arma equipaggiata (o un attacco base se disarmato).
-
+   - Eseguire l'Attacco dell'arma equipaggiata: Se nessuna arma è equipaggiata, si può eseguire "un colpo base" che fa sempre 1 danno e conta come colpo mancato.
+   > Inoltre, in questa fase è possibile attivare i trucchetti giocandoli direttamente dalla mano senza costi.
 5. **Fase di fine turno:** 
    - Si attivano gli effetti "alla fine del turno".
    - Terminano gli effetti che durano "fino alla fine del turno".

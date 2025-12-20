@@ -1,0 +1,224 @@
+import asyncio
+import os
+from typing import override
+
+from flet import app
+from flet.core.column import Column
+from flet.core.page import Page
+from flet.core.progress_bar import ProgressBar
+from flet.core.snack_bar import SnackBar
+from flet.core.text import Text
+from flet.core.types import ThemeMode, AppView, FontWeight, MainAxisAlignment, CrossAxisAlignment
+from flet.core.view import View
+
+from client_views.fletapp.apptheme import AppTheme
+from client_views.fletapp.locals.en_US import en_US
+from client_views.fletapp.views.lobby_views import HomeView, DeployView
+from client_views.view_interface import ViewInterface
+from core.game import Game
+from networking.utils import CSActions, setup_logging
+
+
+class FletClient(ViewInterface):
+    def __init__(self, page:Page, uri: str):
+        super().__init__(uri)
+        self._page = page
+        #UI Setup
+        self._page.theme_mode = ThemeMode.DARK
+        self._page.title = "Dust Access"
+        self._page.fonts = {
+            "Noto Sans": "fonts/NotoSans.ttf",
+        }
+
+        # Lifecycle Handlers
+        self._page.on_connect = self._handle_reconnection
+        self._page.on_disconnect = self._on_browser_close
+        self._page.on_route_change = self._route_change
+        self._page.on_view_pop = self._view_pop
+
+        self._page.views.append(
+            View(
+                "/",
+                [
+                    Column(
+                        [
+                            ProgressBar(width=400),
+                            Text("Synchronizing Session...", font_family='Noto Sans', weight=FontWeight.W_200),
+                        ],
+                        alignment= MainAxisAlignment.CENTER,
+                        horizontal_alignment=CrossAxisAlignment.CENTER,
+                    )
+                ],
+                vertical_alignment=MainAxisAlignment.CENTER,
+                horizontal_alignment=CrossAxisAlignment.CENTER,
+            )
+        )
+        self._page.update()
+
+        self._page.run_task(self._initialize_app)
+
+    async def _handle_reconnection(self, e):
+        # Use an internal flag to prevent concurrent initialization tasks
+        if getattr(self, "_initializing", False):
+            return
+
+        if not self.client.running:
+            self._initializing = True
+            try:
+                await self._initialize_app()
+            finally:
+                self._initializing = False
+
+    async def _initialize_app(self):
+        print("[INIT] Syncing state with server...")
+
+        # Restore persistent session
+        rid = await self._page.client_storage.get_async("room_name")
+        cid = await self._page.client_storage.get_async("client_id")
+
+        if rid and cid:
+            self.client.room_name = rid
+            self.client.client_id = cid
+            is_reconnecting = True
+        else:
+            is_reconnecting = False
+
+        # START networking (The loop in client_base.py)
+        # Note: start() sets self.running = True internally
+        self._page.run_task(self.client.start)
+
+        # Handshake Grace Period
+        if is_reconnecting:
+            # Wait for interpret_message to receive ROOM_JOINED or 3 s timeout
+            for _ in range(15):  # 15 * 0.2 = 3 seconds
+                if self._page.route != "/": return
+                await asyncio.sleep(0.2)
+
+        # Final Fallback
+        if self._page.route == "/":
+            self._page.go("/home")
+
+    async def _on_browser_close(self, e=None):
+        # Wait a few seconds before fully disconnecting the game client.
+        # If the user refreshed, 'on_connect' will trigger before this finishes.
+        await asyncio.sleep(5)
+        if not self.client.connected:
+            print("Session truly lost. Cleaning up networking.")
+            await self.client.disconnect()
+
+    def _route_change(self, e):
+        """
+        Standard Flet Router.
+        Note: We clear views to ensure we don't stack the 'Loading' view forever.
+        """
+        route = self._page.route
+        print(f"[ROUTE] Navigating to: {route}")
+
+        self._page.views.clear()
+
+        # ROUTE: HOME
+        if route == "/home" or route == "/":
+            self._page.views.append(
+                HomeView(self._page,
+                         localization=en_US,
+                         on_quick_match=self.search_quick_match,
+                         on_create=self.create_private_room,
+                         on_join=self.send_join_request)
+            )
+
+        # ROUTE: DEPLOY / LOBBY
+        elif route == "/deploy":
+            self._page.views.append(DeployView(self._page))
+
+        self._page.update()
+
+    def _view_pop(self, view):
+        self._page.views.pop()
+        top_view = self._page.views[-1]
+        self._page.go(top_view.route)
+
+    async def send_join_request(self, room_code: str):
+        await self.send_action(room_code, CSActions.JOIN,None, self.client.client_id)
+    async def search_quick_match(self, e=None):
+        await self.send_action(self.client.room_name, CSActions.QUICK_MATCH, None, None)
+    async def create_private_room(self, e=None):
+        await self.send_action(self.client.room_name, CSActions.CREATE_ROOM, None, "private")
+
+    async def update_lobby(self, lobby_data):
+        #todo: update lobby UI
+        self._page.update()
+    async def update_to_state(self, game_state: Game):
+        #TODO: update UI
+        self._page.update()
+
+    # messages to be processed by this function are:
+    # - CSActions.ROOM_JOINED (show room and deck configuration)
+    # - CSActions.DECKS_AVAILABLE (to construct deck selection dropdown)
+    # - CSActions.DECK_ISVALID (to be received after deck selection)
+    # - CSActions.SPECS_AVAILABLE (to construct spec selection dropdown)
+    # - CSActions.SPEC_ISVALID (to be received after spec selection)
+    async def interpret_message(self, message: dict):
+        """
+        The message handler is now responsible for 'finishing' the init sequence.
+        """
+        m_type = CSActions(message.get("type"))
+        content = message.get("content")
+
+        match m_type:
+            case CSActions.ROOM_JOINED:
+                # Save to browser storage for next refresh
+                await self._page.client_storage.set_async("room_name", self.client.room_name)
+                await self._page.client_storage.set_async("client_id", self.client.client_id)
+
+                # Navigate away from the Loading screen
+                self._page.go("/deploy")
+
+            case CSActions.ERROR:
+                # If rejoining failed, clear storage and go home
+                if self._page.route == "/":
+                    await self._page.client_storage.clear_async()
+                    self._page.go("/home")
+
+            case _:
+                pass
+    async def handle_error(self, error: str):
+        if error == "RELOAD_REQUIRED":
+            print("Protocol mismatch detected. Forcing browser reload...")
+            self._page.update()
+            return
+        elif "no longer exists" in error:
+            # Instead of just an error, clear the stale room from storage
+                await self._page.client_storage.remove_async("room_name")
+                self.client.room_name = None
+
+                self._page.go("/home")
+
+        self._page.overlay.append(
+                View(controls=[
+                    SnackBar(
+                        content=Text(error, color=AppTheme.COLOR_FG, font_family='Noto Sans', weight=FontWeight.BOLD),
+                        bgcolor=AppTheme.BLUE_3,
+                        open=True
+                    )
+                ])
+        )
+    async def show_info(self, info_msg: str): pass
+
+    @override
+    async def on_handshake_complete(self, content):
+        await super().on_handshake_complete(content)
+        # Persistent storage update
+        await self._page.client_storage.set_async("client_id", self.client.client_id)
+        await self._page.client_storage.set_async("session_secret", self.client.session_secret)
+
+# INIT SCRIPTS
+async def start_client(page:Page):
+        setup_logging()
+        uri = os.getenv("SERVER_URL", "ws://localhost:8765")
+        flet_client = FletClient(page, uri)
+
+def app_runner():
+    app(target=start_client, view=AppView.WEB_BROWSER, assets_dir=AppTheme.ASSET_DIR)
+
+if __name__ == "__main__":
+    app_runner()

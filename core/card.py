@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
+from typing_extensions import override
+
 from core.enums import AccessorClass, CardType, Stats, Scaling
+from core.serialization import DataclassJSONCapable
 
 
 #A card can contain lots of things.
@@ -15,7 +18,7 @@ from core.enums import AccessorClass, CardType, Stats, Scaling
 
 
 @dataclass #it gens a default __init__ (+ other cool things like __repr__, a sort of toString) and makes attributes look like... attributes. And that's good!
-class Card:
+class Card(DataclassJSONCapable):
     name:str
     Text:str
     Flavor:str
@@ -25,17 +28,30 @@ class Card:
     level:int
     cd:int
     currentCD:int
-
-    #The next attributes are to be used with: 
-    #   gettattr(cardEffects, <attrName>)(<attrValue>)
-    #Example:
-    #   gettattr(cardEffects, <attrName>)(<attrValue>)
     OnPlay:str
     OnActivate:str
     OnNextTurn:str
     OnNextPlayerTurn:str
     OnRemove:str
     WhileinPlay:str
+
+    @classmethod
+    @override
+    def dict_deserializer(cls, data):
+        # 1. Peek at the 'cardType' field in the raw data
+        c_type_str = data.get('cardType')
+
+        # 2. Determine the correct subclass
+        target_cls = Card
+        if c_type_str in [CardType.WEAPON, CardType.DUAL]:
+            target_cls = WeaponCard
+        elif c_type_str in [CardType.SKILL, CardType.INSTANT]:
+            target_cls = SkillCard
+        # ... etc ...
+
+        # 3. Call the parent implementation, but binding it to the specific subclass
+        # This effectively calls WeaponCard.from_dict(data) using the logic we defined in the Mixin
+        return super(Card, target_cls).dict_deserializer(data)
 
 
 @dataclass
@@ -52,8 +68,6 @@ class WeaponCard(EquipCard):
     AtkStat:Stats
     AtkFunc:Scaling
     AtkCoeff:int
-    
-    # to use with gettattr(cardEffects, <attrName>)(<attrValue>)
     OnHit:str
     OnMiss:str
 
@@ -61,12 +75,11 @@ class WeaponCard(EquipCard):
 class SkillCard(Card):
     isInstant:bool
     ChainsWith:str
-    # to use with gettattr(cardEffects, <attrName>)(<attrValue>)
+    OnChainActivate:str
     OnHit:str
     OnMiss:str
 
 @dataclass
 class CantripCard(Card):
-    # to use with gettattr(cardEffects, <attrName>)(<attrValue>)
     OnHit:str
     OnMiss:str

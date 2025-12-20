@@ -1,3 +1,10 @@
+sessions.json
+sessions.json.tmp
+.runlogs/
+
+# Railway cache
+.railway/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dust-access-simulator"
-version = "0.0.1"
+version = "0.0.2a"
 description = "A Simulator for the ECG game Dust Access"
 authors = ["Maria Vicidomini <a.vicidomini36@studenti.unisa.it>"]
 readme = "README.md"
@@ -10,9 +10,11 @@ package-mode = false
 python = "^3.13.5"
 poetry-core = "^2.2.1"
 pandas = "^2.3.3"
-flet = "^0.28.3"
 websockets = "^15.0.1"
-aiohttp = "^3.13.2"
+flet = "^0.28.3"
+pandas-stubs = "^2.3.3.251201"
+typing-extensions = "^4.15.0"
+fonttools = "^4.61.1"
 
 [build-system]
 requires = ["poetry-core"]
