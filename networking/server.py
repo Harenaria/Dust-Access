@@ -15,26 +15,28 @@ from core.enums import Actions
 from core.game import matchCreator, Game
 from networking.room import Room
 from networking.session_manager import SessionManager
-from networking.utils import CSActions, get_available_decks, get_available_specializations, sanitized_state, \
+from networking.utils import CSActions, sanitized_state, \
     GameEncoder, setup_logging, GLOBAL_PROTOCOL_VERSION
+from core.utils import get_available_specializations, get_available_decks
 
 logger = logging.getLogger("WsServer")
+
 
 class WsServer:
     def __init__(self):
         self.clients: Dict[str, websockets.ServerConnection] = dict()
         self.rooms: dict[str, Room] = {}
         # Used for Game initialization
-        self.clientNames: Dict[str, str] = dict() #client_id, accessor_name
-        self.clientDecks: Dict[str, int] = dict() #client_id, deck_id
-        self.clientSpecs: Dict[str, str] = dict() #client_id, spec_name
+        self.clientNames: Dict[str, str] = dict()  #client_id, accessor_name
+        self.clientDecks: Dict[str, int] = dict()  #client_id, deck_id
+        self.clientSpecs: Dict[str, str] = dict()  #client_id, spec_name
         self.clientReady: Dict[str, bool] = dict()
 
         self.SESSION_PATH = os.environ.get("SESSION_PATH", "sessions.json")
         self.session_manager: SessionManager = SessionManager(storage_path=self.SESSION_PATH)
 
         #used for keeping track of games
-        self.games: Dict[str, Game] = dict() #room_code, game_state
+        self.games: Dict[str, Game] = dict()  #room_code, game_state
 
     async def register_client(self, websocket, client_id: str):
         """Register a new client connection"""
@@ -76,7 +78,8 @@ class WsServer:
 
             logger.info(f"WsClient {client_id} disconnected. Remaining clients: {len(self.clients)}")
             print(f"WsClient {client_id} disconnected. Remaining clients: {len(self.clients)}")
-    async def handle_client(self, conn:ServerConnection):
+
+    async def handle_client(self, conn: ServerConnection):
         """Handle individual client connection"""
         client_id = None
         try:
@@ -246,7 +249,7 @@ class WsServer:
 
             case CSActions.QUICK_MATCH:
                 target_room = next((r for r in self.rooms.values()
-                               if r.is_joinable_via_quick_match), None)
+                                    if r.is_joinable_via_quick_match), None)
                 # Join or Create
                 if target_room:
                     # --- JOIN LOGIC ---
@@ -348,11 +351,14 @@ class WsServer:
                     await self._broadcast_lobby_state(room_code)
             case CSActions.SET_NAME:
                 accessor_name = data.get("content")
+                room_code = data.get("room")
                 self.clientNames[client_id] = accessor_name
-                for room_id, members in self.rooms.items():
-                    if client_id in members:
-                        await self._broadcast_lobby_state(room_id)
-                        break
+                await self._broadcast_lobby_state(room_code)
+            case CSActions.PLAYER_READY:
+                client_id = data.get("content")
+                room_code = data.get("room")
+                self.clientReady[client_id] = True
+                await self._broadcast_lobby_state(room_code)
             case CSActions.START_GAME:
                 room_code = data.get("room")
                 if not self._validate_room_membership(client_id, room_code): return
@@ -364,7 +370,15 @@ class WsServer:
                         "content": "Only the host can start the game."
                     }))
                     return
-
+                for client in self.rooms[room_code].clients:
+                    if not self.clientReady[client]:
+                        await self.clients[client].send(json.dumps({
+                            "type": CSActions.ERROR.value,
+                            "from": "Server",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": f"{client} is not ready."
+                        }))
+                        return
                 # for now, only 2 player matches are supported
                 if room_code in self.rooms and not self.rooms[room_code].is_full:
                     p1_id = self.rooms[room_code].clients[0]
@@ -428,7 +442,7 @@ class WsServer:
                         "content": result["error"]
                     }))
             case CSActions.REMATCH:
-                pass #TODO: Rematch logic
+                pass  #TODO: Rematch logic
             case _:
                 pass
 
@@ -471,7 +485,7 @@ class WsServer:
             # Get the player's name or a default one
             name = self.clientNames.get(cid, f"Player {i + 1}")
 
-            # Get ready status (e.g., if they have selected a deck)
+            # Get ready status
             is_ready = (cid in self.clientDecks and cid in self.clientSpecs and cid in self.clientReady)
 
             lobby_data["players"].append({
@@ -506,7 +520,7 @@ class WsServer:
                 "timestamp": datetime.now().isoformat(),
                 "content": json.dumps(
                     sanitized_state(self.games[room_code], i),
-                    cls=GameEncoder #useful as Game wouldn't be serializable otherwise
+                    cls=GameEncoder  #useful as Game wouldn't be serializable otherwise
                 )
                 # every client gets their own sanitized state with only covered cards in the opponent's hand
             }
@@ -520,11 +534,11 @@ class WsServer:
         port = os.getenv("PORT", 8765)
         logger.info(f"Starting WebSocket networking on {host}:{port}")
         async with websockets.serve(
-            self.handle_client,
-            host,
-            port,
-            ping_interval=5,
-            ping_timeout=3
+                self.handle_client,
+                host,
+                port,
+                ping_interval=5,
+                ping_timeout=3
         ):
             await asyncio.Future()
 
@@ -533,10 +547,12 @@ class WsServer:
             self.session_manager.cleanup_zombies()
             await asyncio.sleep(3600)  # Run cleanup every hour
 
+
 def server_factory() -> WsServer:
     server = WsServer()
     asyncio.run(server.start_server())
     return server
+
 
 if __name__ == "__main__":
     server_factory()

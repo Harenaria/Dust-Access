@@ -8,17 +8,9 @@ from dataclasses import is_dataclass
 from enum import Enum, auto
 from typing import override
 
-import pandas as pd
-
-from core.deck import get_deck_base_specializations
 from core.game import Game
 
 GLOBAL_PROTOCOL_VERSION:str = "0.0.2a"
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 log_context = contextvars.ContextVar("log_context", default="")
 class ContextFilter(logging.Filter):
@@ -51,9 +43,6 @@ def setup_logging():
 
 logger = logging.getLogger("UtilityFunctions")
 
-# Used to read deck/spec data
-DATA_DIR = os.path.join(project_root, "data")
-
 
 class CSActions(Enum):
     HANDSHAKE = auto()
@@ -72,6 +61,7 @@ class CSActions(Enum):
     SPECS_AVAILABLE = auto()
     SEND_SPEC = auto()
     SPEC_ISVALID = auto()
+    PLAYER_READY = auto()
     LOBBY_UPDATE = auto()
     START_GAME = auto()
     ACTION_EXECUTED = auto()
@@ -94,39 +84,16 @@ def sanitized_state(real_game:Game, player_id:int):
         logger.error(f"Deep copy or card sanitization failed for player {player_id}: {e}")
         return real_game #FIXME: feels dangerous, but I don't know what else to do for now
 
-# --- HELPER FUNCTIONS ---
-def get_available_specializations(deck_id=None) -> list[str]:
-    if deck_id is not None:
-        try:
-            deck_specs = get_deck_base_specializations(deck_id)
-            if deck_specs: return deck_specs
-        except Exception as e:
-            logger.warning(f"Failed to read specs from deck {deck_id}: {e}")
+# --- HELPERS ---
+def get_opponent_name(lobby_data: dict, my_id: str) -> str | None:
+    """Finds the name of the first player in the lobby that isn't the current client."""
+    players = lobby_data.get("players", [])
+    for p in players:
+        if p.get("id") != my_id:
+            return p.get("name")
+    return None
 
-    try:
-        path = os.path.join(DATA_DIR, "Specializations.csv")
-        if not os.path.exists(path): return ["Scraper", "Crawler", "Querist"]
-        df = pd.read_csv(path)
-        return df[df['isBase'] == 1]['Name'].tolist()
-    except Exception:
-        return ["Scraper", "Crawler", "Querist"]
-
-
-def get_available_decks() -> list[int]:
-    decks = []
-    if not os.path.exists(DATA_DIR):
-        logger.error(f"DATA_DIR not found: {DATA_DIR}")
-        return []
-
-    for filename in os.listdir(DATA_DIR):
-        if filename.endswith('.csv') and filename != 'Specializations.csv' and filename != 'Cards.csv':
-            try:
-                decks.append(int(filename.replace('.csv', '')))
-            except:
-                continue
-    return sorted(decks)
-
-
+# --- EXCEPTIONS ---
 class ClientDisconnected(Exception): pass
 
 # ------------------------------ JSON ENCODER ------------------------------

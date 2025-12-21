@@ -1,5 +1,6 @@
 sessions.json
 sessions.json.tmp
+/TODO.txt
 .runlogs/
 
 # Railway cache

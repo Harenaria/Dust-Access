@@ -16,13 +16,15 @@ from client_views.fletapp.locals.en_US import en_US
 from client_views.fletapp.views.lobby_views import HomeView, DeployView
 from client_views.view_interface import ViewInterface
 from core.game import Game
-from networking.utils import CSActions, setup_logging
+from networking.utils import CSActions, setup_logging, get_opponent_name
 
 
 class FletClient(ViewInterface):
     def __init__(self, page:Page, uri: str):
         super().__init__(uri)
         self._page = page
+        self.last_lobby_data = {}
+        self.localization:dict = en_US
         #UI Setup
         self._page.theme_mode = ThemeMode.DARK
         self._page.title = "Dust Access"
@@ -120,7 +122,7 @@ class FletClient(ViewInterface):
         if route == "/home" or route == "/":
             self._page.views.append(
                 HomeView(self._page,
-                         localization=en_US,
+                         localization=self.localization,
                          on_quick_match=self.search_quick_match,
                          on_create=self.create_private_room,
                          on_join=self.send_join_request)
@@ -128,7 +130,20 @@ class FletClient(ViewInterface):
 
         # ROUTE: DEPLOY / LOBBY
         elif route == "/deploy":
-            self._page.views.append(DeployView(self._page))
+            current_opp = get_opponent_name(self.last_lobby_data, self.client.client_id)
+            self._page.views.append(
+                DeployView(self._page,
+                           localization=self.localization,
+                           room_code=self.client.room_name,
+                           set_name=self.set_name,
+                           opp_name=current_opp,
+                           get_decks=self.get_decks,
+                           set_deck=self.set_deck,
+                           get_specs=self.get_specs,
+                           set_spec=self.set_spec,
+                           on_deploy=self.confirm_ready
+                           )
+            )
 
         self._page.update()
 
@@ -143,10 +158,27 @@ class FletClient(ViewInterface):
         await self.send_action(self.client.room_name, CSActions.QUICK_MATCH, None, None)
     async def create_private_room(self, e=None):
         await self.send_action(self.client.room_name, CSActions.CREATE_ROOM, None, "private")
+    async def set_name(self, name: str):
+        await self.send_action(self.client.room_name, CSActions.SET_NAME, None, name)
+    async def get_decks(self, e=None):
+        await self.send_action(self.client.room_name, CSActions.DECKS_AVAILABLE, None, None)
+    async def get_specs(self, deck_id:int):
+        await self.send_action(self.client.room_name, CSActions.SPECS_AVAILABLE, None, deck_id)
+    async def set_deck(self, deck_id:int):
+        await self.send_action(self.client.room_name, CSActions.SEND_DECK, None, deck_id)
+    async def set_spec(self, spec_name:str):
+        await self.send_action(self.client.room_name, CSActions.SEND_SPEC, None, spec_name)
+    async def confirm_ready(self, e=None):
+        await self.send_action(self.client.room_name, CSActions.PLAYER_READY, None, self.client.client_id)
 
     async def update_lobby(self, lobby_data):
-        #todo: update lobby UI
-        self._page.update()
+        self.last_lobby_data = lobby_data
+        opp_name = get_opponent_name(lobby_data, self.client.client_id)
+        if self._page.route == "/deploy":
+            opponent_control = self._page.get_control("opponent_control")
+            if opponent_control and isinstance(opponent_control, Text):
+                opponent_control.value =f"vs. {opp_name}" if opp_name else self.localization['waiting_opponent']
+            self._page.update()
     async def update_to_state(self, game_state: Game):
         #TODO: update UI
         self._page.update()
