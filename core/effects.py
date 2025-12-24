@@ -72,6 +72,7 @@ class Effects:
 
         except Exception as e:
             self._log_error(f"Error parsing '{clean_str}': {e}")
+        self.game = None
 
     @staticmethod
     def _convert_arg(arg: str) -> Any:

@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 from core.card import WeaponCard
@@ -9,27 +10,41 @@ from core.serialization import DataclassJSONCapable
 
 
 def matchCreator(room:str, name1: str, deck1: int, spec1: str, name2: str, deck2: int, spec2: str):
-    players = [Player(True, name1, deck1, spec1), Player(False, name2, deck2, spec2)]
-    return Game(room, players)
+    p1 = Player.create_new(True, name1, deck1, spec1)
+    p2 = Player.create_new(False, name2, deck2, spec2)
 
+    return Game(room, [p1, p2])
 
+@dataclass
 class Game(DataclassJSONCapable):
-    def __init__(self, room:str, players: List[Player]):
-        self.current_action_args = None
-        self.players: List[Player] = players
-        self.turn: int = 1
-        self.arePlayersReady = [False, False]
-        # noinspection PyTypeChecker
-        self.isPlaying: bool = 0  # 0 per P1, 1 per P2
-        self.hasMulligan = [False, False]
-        self.ready_in_setup = [False, False]
-        self.phase: Phases = Phases.SETUP
-        self.winner: Winner = Winner.NONE
-        self.logs: GameLogger = GameLogger(room, list())
+    room: str
+    players: List[Player]
+    turn: int = 1
+    arePlayersReady: List[bool] = field(default_factory=lambda: [False, False])
+    isPlaying: int = 0
+    hasMulligan: List[bool] = field(default_factory=lambda: [False, False])
+    ready_in_setup: List[bool] = field(default_factory=lambda: [False, False])
+    phase: Phases = Phases.SETUP
+    winner: Winner = Winner.NONE
+    logs: GameLogger = None
+
+    def __post_init__(self):
+        # Initialize internal logic objects
+        if self.logs is None:
+            self.logs = GameLogger(self.room, [])
+
         self.effectResolver = Effects()
         self.current_action_args = {}
-        self.nextPhase()
-        # start game
+
+        raw_players: Any = self.players
+
+        if raw_players and isinstance(raw_players[0], dict):
+            self.players = [Player(**p) for p in raw_players]
+
+        # Only run the startup logic if this is a fresh game (Phase SETUP, Turn 1, Empty Hands).
+        # This prevents the client from running game logic when deserializing an existing state.
+        if self.phase == Phases.SETUP and self.turn == 1 and all(len(p.hand) == 0 for p in self.players):
+            self.nextPhase()
 
     def nextPhase(self):
         match self.phase:
@@ -287,8 +302,8 @@ class Game(DataclassJSONCapable):
                 # Equip
                 real_card = current_player.hand.pop(args['index'])
                 if real_card.cardType.value == CardType.DUAL:
-                    current_player.equippedCards[CardType.WEAPON.value] = real_card
-                    current_player.equippedCards[CardType.OFF_HAND.value] = None
+                    current_player.equippedCards[CardType.WEAPON] = real_card
+                    current_player.equippedCards[CardType.OFF_HAND] = None
                 else:
                     current_player.equippedCards[real_card.cardType.value] = real_card
 
@@ -415,7 +430,7 @@ class Game(DataclassJSONCapable):
                 final_dmg, is_hit = self.checkDamage(player, damage)
 
                 # OnHit / OnMiss
-                weapon = current_player.equippedCards['Weapon']
+                weapon = current_player.equippedCards[CardType.WEAPON]
                 if weapon:
                     if is_hit:
                         self.effectResolver.resolve(weapon.OnHit, self)
@@ -528,7 +543,7 @@ class Game(DataclassJSONCapable):
 
     # noinspection PyUnreachableCode
     def calcWeaponDamage(self, player: int):
-        weapon: WeaponCard = self.players[player].equippedCards['Weapon']
+        weapon: WeaponCard = self.players[player].equippedCards[CardType.WEAPON]
         if weapon is None:
             return 1
         stat = self.calcPlayerStat(player, weapon.AtkStat)
@@ -646,8 +661,8 @@ class Game(DataclassJSONCapable):
     def checkDual(self, player: int, card_index: int):
         card = self.players[player].hand[card_index]
         if isinstance(card, WeaponCard) and card.cardType == CardType.DUAL:
-            if self.players[player].equippedCards['Off-Hand']:
-                self.players[player].equippedCards['Off-Hand'] = None
+            if self.players[player].equippedCards[CardType.OFF_HAND]:
+                self.players[player].equippedCards[CardType.OFF_HAND] = None
                 self.logs.append(LogEntry(
                     self.turn,
                     self.isPlaying,
@@ -656,23 +671,24 @@ class Game(DataclassJSONCapable):
                 ))
 
         if card.cardType == CardType.OFF_HAND:
-            weapon = self.players[player].equippedCards['Weapon']
+            weapon = self.players[player].equippedCards[CardType.WEAPON]
             if weapon and weapon.cardType == CardType.DUAL:
                 return {"valid": False, "error": "Cannot equip Off-Hand with a Dual Weapon"}
         return None
 
     def _deal_init_hand(self, player):
-        self.players[player].hand = []
+        p = self.players[player]
+        p.hand = []
         count = 5 if player == 0 else 6
         for i in range(count):
-            if len(self.players[player].deck.cards) > 0:
-                self.players[player].hand.append(self.players[player].deck.cards.pop())
+            if len(p.deck.cards) > 0:
+                p.hand.append(p.deck.cards.pop())
         self.recalculateStats(player)
-        self.players[player].currentHP = self.players[player].currentDurability
+        p.currentHP = p.currentDurability
         self.logs.append(LogEntry(
             self.turn,
             self.isPlaying,
             self.phase,
-            f"{self.players[player].accessorName} draws their initial hand."
+            f"{p.accessorName} draws their initial hand."
         ))
         return {"valid": True}

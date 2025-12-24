@@ -1,6 +1,7 @@
 {
   "0" : {
     "name": "Heavy Half-Deck",
+    "classes": ["Heavy"],
     "author": "Dust Access ECG Team",
     "description": "An introduction to the Heavy class",
     "isOfficial": true

@@ -8,14 +8,14 @@ from flet.core.icons import Icons
 from flet.core.row import Row
 from flet.core.text import Text
 from flet.core.text_style import TextStyle
-from flet.core.textfield import TextField
+from flet.core.textfield import TextField, TextCapitalization
 from flet.core.padding import Padding
-from flet.core.types import FontWeight
+from flet.core.types import FontWeight, CrossAxisAlignment
 
 from client_views.fletapp.apptheme import AppTheme
 
 
-def StyledTextInput(localization:dict[str,str], on_submit):
+def StyledTextInput(localization:dict[str,str], on_submit, hint_text_localization_id:str, title_localization_id:str, isCapitalized:bool):
     async def handle_submit(e):
         await on_submit(text_input.value)
     text_input = TextField(
@@ -27,9 +27,9 @@ def StyledTextInput(localization:dict[str,str], on_submit):
         height=36,
         expand=True,
         border_radius=0,
-        hint_text="Enter Code...",
+        hint_text=localization[hint_text_localization_id],
         hint_style=TextStyle(color=Colors.with_opacity(0.7, AppTheme.COLOR_FG), size=16, font_family='Noto Sans'),
-
+        capitalization=TextCapitalization.CHARACTERS if isCapitalized else None,
         # Handle "Enter" key press
         on_submit=handle_submit
     )
@@ -54,7 +54,7 @@ def StyledTextInput(localization:dict[str,str], on_submit):
         width=300,
         controls=[
             Text(
-                localization['join_room'],
+                localization[title_localization_id],
                 size=20,
                 font_family='Noto Sans',
                 weight=FontWeight.W_600,
@@ -63,7 +63,7 @@ def StyledTextInput(localization:dict[str,str], on_submit):
             # The Input Row
             Row(
                 spacing=15,  # Gap between input and button
-                vertical_alignment="center",
+                vertical_alignment=CrossAxisAlignment.CENTER,
                 controls=[
                     text_input,
                     action_button

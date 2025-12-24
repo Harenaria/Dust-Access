@@ -4,11 +4,13 @@ import json
 import logging
 import os
 import sys
-from dataclasses import is_dataclass
 from enum import Enum, auto
-from typing import override
+from typing import Any
+
+import numpy as np
 
 from core.game import Game
+from core.serialization import DataclassJSONCapable
 
 GLOBAL_PROTOCOL_VERSION:str = "0.0.2a"
 
@@ -98,14 +100,28 @@ class ClientDisconnected(Exception): pass
 
 # ------------------------------ JSON ENCODER ------------------------------
 class GameEncoder(json.JSONEncoder):
-    @override
-    def default(self, obj):
-        if isinstance(obj, Enum):
-            return obj.value
-        # Assuming any complex object we want to serialize inherits the Mixin DataclassJSONCapable
-        if hasattr(obj, 'dict_serializer') and callable(obj.dict_serializer):
-            return obj.dict_serializer()
-        # If the object is a dataclass without the mixin (e.g., LogEntry if not updated)
-        if is_dataclass(obj) and not isinstance(obj, type):
-            return dataclasses.asdict(obj)
-        return super().default(obj)
+    def default(self, o: Any) -> Any:
+        # Handle Numpy Integer types (int64, int32, etc.)
+        if isinstance(o, (np.integer, np.int64)):
+            return int(o)
+        # Handle Numpy Float types (float64, float32, etc.)
+        if isinstance(o, (np.floating, np.float64)):
+            return float(o)
+
+        # Handle Numpy Arrays
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+
+        # Handle Dataclasses (Game, Deck, Player, Card)
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+
+        # Handle Enums (Actions, Phases, etc.)
+        if isinstance(o, Enum):
+            return o.value
+
+        # Fallback for the custom mixin
+        if isinstance(o, DataclassJSONCapable):
+            return dataclasses.asdict(o)
+
+        return super().default(o)

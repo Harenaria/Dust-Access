@@ -6,6 +6,7 @@ from flet import app
 from flet.core.column import Column
 from flet.core.page import Page
 from flet.core.progress_bar import ProgressBar
+from flet.core.ref import Ref
 from flet.core.snack_bar import SnackBar
 from flet.core.text import Text
 from flet.core.types import ThemeMode, AppView, FontWeight, MainAxisAlignment, CrossAxisAlignment
@@ -24,6 +25,7 @@ class FletClient(ViewInterface):
         super().__init__(uri)
         self._page = page
         self.last_lobby_data = {}
+        self._last_chose_deck:int|None = None
         self.localization:dict = en_US
         #UI Setup
         self._page.theme_mode = ThemeMode.DARK
@@ -37,6 +39,10 @@ class FletClient(ViewInterface):
         self._page.on_disconnect = self._on_browser_close
         self._page.on_route_change = self._route_change
         self._page.on_view_pop = self._view_pop
+
+        # VIew injector hooks for dynamic partial view updating.
+        self._opponent_name_ref:Ref[Text] = Ref[Text]()
+
 
         self._page.views.append(
             View(
@@ -131,19 +137,14 @@ class FletClient(ViewInterface):
         # ROUTE: DEPLOY / LOBBY
         elif route == "/deploy":
             current_opp = get_opponent_name(self.last_lobby_data, self.client.client_id)
-            self._page.views.append(
-                DeployView(self._page,
-                           localization=self.localization,
-                           room_code=self.client.room_name,
-                           set_name=self.set_name,
-                           opp_name=current_opp,
-                           get_decks=self.get_decks,
-                           set_deck=self.set_deck,
-                           get_specs=self.get_specs,
-                           set_spec=self.set_spec,
-                           on_deploy=self.confirm_ready
-                           )
-            )
+            deploy_view = DeployView(self._page, localization=self.localization, room_code=self.client.room_name,
+                       set_name=self.set_name, set_deck=self.set_deck,
+                       set_spec=self.set_spec, on_deploy=self.confirm_ready,
+                       on_start_game=self.start_game,
+                       opp_ref=self._opponent_name_ref, opp_name=current_opp)
+            self._page.views.append(deploy_view)
+            # We need to fetch decks immediately
+            self._page.run_task(self.get_decks)
 
         self._page.update()
 
@@ -161,24 +162,28 @@ class FletClient(ViewInterface):
     async def set_name(self, name: str):
         await self.send_action(self.client.room_name, CSActions.SET_NAME, None, name)
     async def get_decks(self, e=None):
-        await self.send_action(self.client.room_name, CSActions.DECKS_AVAILABLE, None, None)
+        await self.send_action(self.client.room_name, CSActions.GET_DECK, None, en_US.language)
+        return
     async def get_specs(self, deck_id:int):
-        await self.send_action(self.client.room_name, CSActions.SPECS_AVAILABLE, None, deck_id)
+        await self.send_action(self.client.room_name, CSActions.GET_SPEC, None, deck_id)
     async def set_deck(self, deck_id:int):
         await self.send_action(self.client.room_name, CSActions.SEND_DECK, None, deck_id)
     async def set_spec(self, spec_name:str):
         await self.send_action(self.client.room_name, CSActions.SEND_SPEC, None, spec_name)
     async def confirm_ready(self, e=None):
         await self.send_action(self.client.room_name, CSActions.PLAYER_READY, None, self.client.client_id)
+    async def start_game(self, e=None):
+        await self.send_action(self.client.room_name, CSActions.START_GAME, None, None)
 
     async def update_lobby(self, lobby_data):
         self.last_lobby_data = lobby_data
         opp_name = get_opponent_name(lobby_data, self.client.client_id)
-        if self._page.route == "/deploy":
-            opponent_control = self._page.get_control("opponent_control")
-            if opponent_control and isinstance(opponent_control, Text):
-                opponent_control.value =f"vs. {opp_name}" if opp_name else self.localization['waiting_opponent']
-            self._page.update()
+        if self._opponent_name_ref.current:
+            self._opponent_name_ref.current.value = f"vs. {opp_name}" if opp_name else self.localization['waiting_opponent']
+            self._opponent_name_ref.current.update()
+        current_view = self._page.views[-1]
+        if isinstance(current_view, DeployView):
+            current_view.update_lobby_status(lobby_data, self.client.client_id)
     async def update_to_state(self, game_state: Game):
         #TODO: update UI
         self._page.update()
@@ -190,9 +195,6 @@ class FletClient(ViewInterface):
     # - CSActions.SPECS_AVAILABLE (to construct spec selection dropdown)
     # - CSActions.SPEC_ISVALID (to be received after spec selection)
     async def interpret_message(self, message: dict):
-        """
-        The message handler is now responsible for 'finishing' the init sequence.
-        """
         m_type = CSActions(message.get("type"))
         content = message.get("content")
 
@@ -210,7 +212,23 @@ class FletClient(ViewInterface):
                 if self._page.route == "/":
                     await self._page.client_storage.clear_async()
                     self._page.go("/home")
-
+            case CSActions.DECKS_AVAILABLE:
+                # Locate the active view and update it with data
+                current_view = self._page.views[-1]
+                if isinstance(current_view, DeployView):
+                    current_view.update_deck_list(content)
+            case CSActions.DECK_ISVALID:
+                #TODO: Get deck id and check specs available
+                await self.get_specs(content)
+            case CSActions.SPECS_AVAILABLE:
+                # Locate the active view and update it with data
+                current_view = self._page.views[-1]
+                if isinstance(current_view, DeployView):
+                    current_view.update_spec_list(content)
+            case CSActions.SPEC_ISVALID:
+                current_view = self._page.views[-1]
+                if isinstance(current_view, DeployView):
+                    current_view.enable_ready_button()
             case _:
                 pass
     async def handle_error(self, error: str):

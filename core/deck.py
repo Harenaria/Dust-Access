@@ -1,4 +1,6 @@
 import random
+from dataclasses import dataclass, field
+
 import pandas as pd
 import os
 import logging
@@ -6,6 +8,7 @@ import logging
 from pandas import DataFrame
 from core import card
 from core import enums
+from core.serialization import DataclassJSONCapable
 
 # Logging
 logger = logging.getLogger("DeckBuilder")
@@ -64,15 +67,74 @@ def get_base_specializations_db() -> pd.DataFrame:
     if df.empty: return df
     return df[df['isBase'] == 1]
 
+@dataclass
+class Deck(DataclassJSONCapable):
+    id:int
+    cards:list = field(default_factory=list)
 
-class Deck:
-    def __init__(self, deckID: int):
-        self.cards = list()
-        self.id = deckID
-        db = get_cards_db()
-        deck_path = os.path.join(DATA_DIR, f"{deckID}.csv")
+    def __post_init__(self):
+        # If 'cards' is empty, it means we are creating a NEW deck.
+        # If 'cards' is NOT empty, it means we are deserializing a saved deck/game,
+        # so we skip the CSV building process.
+        if not self.cards:
+            self._build_from_csv()
+        elif self.cards and isinstance(self.cards[0], dict):
+            self.cards = [self.deserialize_card(c) for c in self.cards]
 
-        logger.info(f"Building Deck {deckID}...")
+    @staticmethod
+    def deserialize_card(data: dict):
+        """Reconstructs a Card object from a dictionary."""
+        # Convert string Enums back to Enum objects
+        if 'cardType' in data and isinstance(data['cardType'], str):
+            try:
+                data['cardType'] = enums.CardType(data['cardType'])
+            except ValueError:
+                pass  # Keep as string or handle error
+
+        if 'acClass' in data and isinstance(data['acClass'], str):
+            try:
+                data['acClass'] = enums.AccessorClass(data['acClass'])
+            except ValueError:
+                pass
+
+        c_type = data.get('cardType')
+
+        # Instantiate based on type
+        # Note: We filter kwargs to avoid 'unexpected argument' errors if JSON has extra fields
+        try:
+            if c_type in [enums.CardType.WEAPON, enums.CardType.DUAL]:
+                # Handle nested Enums for Weapons
+                if 'AtkStat' in data and isinstance(data['AtkStat'], str): data['AtkStat'] = enums.Stats(
+                    data['AtkStat'])
+                if 'AtkFunc' in data and isinstance(data['AtkFunc'], str): data['AtkFunc'] = enums.Scaling(
+                    data['AtkFunc'])
+                return card.WeaponCard(**data)
+
+            elif c_type in [enums.CardType.HEAD, enums.CardType.CHEST, enums.CardType.BRACERS,
+                            enums.CardType.BOOTS, enums.CardType.OFF_HAND]:
+                return card.EquipCard(**data)
+
+            elif c_type in [enums.CardType.SKILL, enums.CardType.INSTANT]:
+                return card.SkillCard(**data)
+
+            elif c_type == enums.CardType.CANTRIP:
+                return card.CantripCard(**data)
+
+            else:
+                return card.Card(**data)
+        except TypeError:
+            # Fallback if strict typing fails, return generic Card
+            return card.Card(**data)
+
+
+    def _build_from_csv(self):
+        # Converting DataFrame to Dictionary once for O(1) lookup and correct typing
+        db_df = get_cards_db()
+        cards_library = db_df.to_dict(orient='index')
+
+        deck_path = os.path.join(DATA_DIR, f"{self.id}.csv")
+
+        logger.info(f"Building Deck {self.id}...")
 
         if not os.path.exists(deck_path):
             logger.error(f"Deck file {deck_path} not found.")
@@ -84,8 +146,7 @@ class Deck:
             if 'isSpec' not in deck_list_df.columns:
                 deck_list_df['isSpec'] = 0
 
-            # Conversione sicura a numerico
-            deck_list_df['isSpec'] = pd.to_numeric(deck_list_df['isSpec'], errors='coerce').fillna(0).astype(int)
+            deck_list_df['isSpec'] = pd.to_numeric(deck_list_df['isSpec'].fillna(0), errors='coerce').astype(int)
 
             for _, row in deck_list_df.iterrows():
                 if row['isSpec'] == 1:
@@ -98,11 +159,11 @@ class Deck:
                 except:
                     in_deck = 1
 
-                if card_name not in db.index:
-                    logger.warning(f"Skipping unknown card '{card_name}' in deck {deckID}")
-                    continue
+                card_data = cards_library.get(card_name)
 
-                card_data = db.loc[card_name]
+                if not card_data:
+                    logger.warning(f"Skipping unknown card '{card_name}' in deck {self.id}")
+                    continue
 
                 for _ in range(in_deck):
                     try:
@@ -112,10 +173,10 @@ class Deck:
                         logger.error(f"Failed to create card '{card_name}': {e}")
 
             random.shuffle(self.cards)
-            logger.info(f"Deck {deckID} ready: {len(self.cards)} cards.")
+            logger.info(f"Deck {self.id} ready: {len(self.cards)} cards.")
 
         except Exception as e:
-            logger.error(f"Critical error building deck {deckID}: {e}")
+            logger.error(f"Critical error building deck {self.id}: {e}")
 
     @staticmethod
     def _create_card_instance(name, data):
@@ -212,7 +273,7 @@ def validate_deck(deck_id: int) -> tuple[bool, str]:
         df = pd.read_csv(os.path.join(DATA_DIR, f"{deck_id}.csv"))
 
         if 'isSpec' not in df.columns: df['isSpec'] = 0
-        df['isSpec'] = pd.to_numeric(df['isSpec'], errors='coerce').fillna(0).astype(int)
+        df['isSpec'] = pd.to_numeric(df['isSpec'].fillna(0), errors='coerce').astype(int)
 
         if 'in_deck' not in df.columns or 'Name' not in df.columns:
             return False, "Invalid Format"
@@ -228,18 +289,29 @@ def validate_deck(deck_id: int) -> tuple[bool, str]:
         return False, str(e)
 
 
-def get_deck_base_specializations(deck_id: int):
+def get_deck_base_specializations(deck_id: int) -> dict[str, str] | None:
     try:
+        # Load the Global Specializations DB
         sp = get_base_specializations_db()
+        if 'Name' in sp.columns:
+            sp = sp.set_index('Name')
+
+        # Load the Deck CSV
         path = os.path.join(DATA_DIR, f"{deck_id}.csv")
-        if not os.path.exists(path): return []
+        if not os.path.exists(path):
+            return None
 
         df = pd.read_csv(path)
-        specs = []
-        for _, row in df.iterrows():
-            name = row['Name']
-            if name in sp.index:
-                specs.append(name)
-        return specs
-    except:
-        return []
+
+        # Filter the DECK to find only rows where isSpec == 1
+        # We fillna(0) to handle empty fields safely before comparing
+        deck_specs = df[df['isSpec'].fillna(0) == 1]['Name']
+
+        # Use the list of names from the deck to filter the global DB
+        valid_specs = sp[sp.index.isin(deck_specs)]
+
+        return valid_specs['Class'].to_dict()
+
+    except Exception as e:
+        print(f"Error loading specs for deck {deck_id}: {e}")
+        return None

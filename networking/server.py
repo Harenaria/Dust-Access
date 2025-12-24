@@ -13,11 +13,11 @@ from websockets import ServerConnection
 from core.deck import validate_deck
 from core.enums import Actions
 from core.game import matchCreator, Game
+from core.utils import get_available_specializations, get_deck_metadata
 from networking.room import Room
 from networking.session_manager import SessionManager
 from networking.utils import CSActions, sanitized_state, \
     GameEncoder, setup_logging, GLOBAL_PROTOCOL_VERSION
-from core.utils import get_available_specializations, get_available_decks
 
 logger = logging.getLogger("WsServer")
 
@@ -233,7 +233,7 @@ class WsServer:
                         "content": {"room": room_code, "client_id": client_id}
                     }))
 
-                    # If game is active, send full state
+                    # If the game is active, send full state
                     if room_code in self.games:
                         await self.send_update_to_clients("Server", room_code)
                     else:
@@ -253,15 +253,18 @@ class WsServer:
                 # Join or Create
                 if target_room:
                     # --- JOIN LOGIC ---
-                    self.rooms[target_room.code].clients.append(client_id)
+                    code = str(target_room.code)
+                    self.rooms[code].clients.append(client_id)
                     logger.info(f"Quick Match: Client {client_id} matched into {target_room}")
-                    # Notify the JOINER
+
+                    # Notify the JOINER Object of type Room is not JSON serializable
+
                     await self.clients[client_id].send(json.dumps({
                         "type": CSActions.ROOM_JOINED.value,
-                        "room": target_room,
+                        "room": code,
                         "from": "Server",
                         "timestamp": datetime.now().isoformat(),
-                        "content": {"room": target_room, "client_id": client_id}
+                        "content": {"room": code, "client_id": client_id}
                     }))
                     # Notify the WAITING PLAYER (Opponent)
                     opponent_id = self.rooms[target_room.code].clients[0]
@@ -290,13 +293,14 @@ class WsServer:
                     }))
             case CSActions.GET_DECK:
                 room_code = data.get("room")
+                language = data.get("content") #localization name received
                 if room_code in self.rooms:
                     message = {
                         "type": CSActions.DECKS_AVAILABLE.value,
                         "room": room_code,
                         "from": client_id,
                         "timestamp": datetime.now().isoformat(),
-                        "content": get_available_decks()
+                        "content": get_deck_metadata(language)
                     }
                     await self.clients[client_id].send(json.dumps(message))
             case CSActions.SEND_DECK:
@@ -310,7 +314,7 @@ class WsServer:
                             "room": room_code,
                             "from": client_id,
                             "timestamp": datetime.now().isoformat(),
-                            "content": "Valid deck!"
+                            "content": deck_id
                         }
                     else:
                         message = {
@@ -380,15 +384,15 @@ class WsServer:
                         }))
                         return
                 # for now, only 2 player matches are supported
-                if room_code in self.rooms and not self.rooms[room_code].is_full:
+                if room_code in self.rooms and self.rooms[room_code].is_full:
                     p1_id = self.rooms[room_code].clients[0]
                     p2_id = self.rooms[room_code].clients[1]
                     game_state = matchCreator(
                         room_code,
-                        self.clientNames[p1_id],
+                        self.clientNames.get(p1_id, "Player 1"),
                         self.clientDecks[p1_id],
                         self.clientSpecs[p1_id],
-                        self.clientNames[p2_id],
+                        self.clientNames.get(p2_id, "Player 2"),
                         self.clientDecks[p2_id],
                         self.clientSpecs[p2_id]
                     )
