@@ -192,7 +192,7 @@ class DeployView(View):
         self.btn_ready = TextButton(
             content=Row(
                 controls=[
-                    Text("deploy", font_family='Noto Sans', size=36, weight=FontWeight.W_400, color=dimmed, style=TextStyle(letter_spacing=-2)),
+                    Text(localization['deploy'], font_family='Noto Sans', size=36, weight=FontWeight.W_400, color=dimmed, style=TextStyle(letter_spacing=-2)),
                     Icon(Icons.CHECK_CIRCLE_OUTLINE_SHARP, color=dimmed, size=36),
                 ],
                 alignment=MainAxisAlignment.CENTER,
@@ -206,7 +206,7 @@ class DeployView(View):
         self.btn_start = TextButton(
             content=Row(
                 controls=[
-                    Text("start game", font_family='Noto Sans', size=36, weight=FontWeight.W_400,
+                    Text(localization['start_game'], font_family='Noto Sans', size=36, weight=FontWeight.W_400,
                          color=AppTheme.YELLOW, style=TextStyle(letter_spacing=-2)),
                     Icon(Icons.ARROW_FORWARD, color=AppTheme.YELLOW, size=36),
                 ],

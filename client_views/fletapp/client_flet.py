@@ -12,8 +12,10 @@ from flet.core.text import Text
 from flet.core.types import ThemeMode, AppView, FontWeight, MainAxisAlignment, CrossAxisAlignment
 from flet.core.view import View
 
+from client_views.fletapp.locals.locale import Locale
 from client_views.fletapp.apptheme import AppTheme
 from client_views.fletapp.locals.en_US import en_US
+from client_views.fletapp.views.board_views import BoardView
 from client_views.fletapp.views.lobby_views import HomeView, DeployView
 from client_views.view_interface import ViewInterface
 from core.game import Game
@@ -26,7 +28,7 @@ class FletClient(ViewInterface):
         self._page = page
         self.last_lobby_data = {}
         self._last_chose_deck:int|None = None
-        self.localization:dict = en_US
+        self.localization:Locale = en_US
         #UI Setup
         self._page.theme_mode = ThemeMode.DARK
         self._page.title = "Dust Access"
@@ -39,6 +41,8 @@ class FletClient(ViewInterface):
         self._page.on_disconnect = self._on_browser_close
         self._page.on_route_change = self._route_change
         self._page.on_view_pop = self._view_pop
+
+        self._latest_game_state: Game | None = None
 
         # VIew injector hooks for dynamic partial view updating.
         self._opponent_name_ref:Ref[Text] = Ref[Text]()
@@ -117,7 +121,6 @@ class FletClient(ViewInterface):
     def _route_change(self, e):
         """
         Standard Flet Router.
-        Note: We clear views to ensure we don't stack the 'Loading' view forever.
         """
         route = self._page.route
         print(f"[ROUTE] Navigating to: {route}")
@@ -145,6 +148,9 @@ class FletClient(ViewInterface):
             self._page.views.append(deploy_view)
             # We need to fetch decks immediately
             self._page.run_task(self.get_decks)
+        elif route == "/game":
+            board_view = BoardView(self._page, localization=self.localization, room_code=self.client.room_name, initial_state=self._latest_game_state)
+            self._page.views.append(board_view)
 
         self._page.update()
 
@@ -185,7 +191,14 @@ class FletClient(ViewInterface):
         if isinstance(current_view, DeployView):
             current_view.update_lobby_status(lobby_data, self.client.client_id)
     async def update_to_state(self, game_state: Game):
-        #TODO: update UI
+        self._latest_game_state = game_state
+        if self._page.route == "/deploy":
+            self._page.go("/game")
+            return
+        if self._page.route == "/game":
+            current_view = self._page.views[-1]
+            if isinstance(current_view, BoardView):
+                current_view.update_game(game_state)
         self._page.update()
 
     # messages to be processed by this function are:
