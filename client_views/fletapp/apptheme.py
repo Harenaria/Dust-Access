@@ -15,6 +15,7 @@ class AppTheme:
     PINK_LIGHT = "#E671B8"
     PINK_DARK = "#FF0097"
     RED = "#E51400"
+    RED_DARK = "#990000"
     YELLOW = "#F09609"
     BROWN = "#A05000"
 

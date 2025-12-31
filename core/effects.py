@@ -97,7 +97,7 @@ class Effects:
         if self.game:
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id if self.game.players else 0,
+                self.game.isPlaying if self.game.players else 0,
                 self.game.phase,
                 f"Effect Error: {message}"
             ))
@@ -133,7 +133,7 @@ class Effects:
             player.counters.remove("Kai")
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName}'s Kai triggers! Power stat used instead of {stat}."
             ))
@@ -148,7 +148,7 @@ class Effects:
 
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{player.accessorName} deals {damage} damage to opponent."
         ))
@@ -172,7 +172,7 @@ class Effects:
         healed = player.currentHP - old_hp
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{player.accessorName} healed for {healed} HP (Req: {amount})."
         ))
@@ -187,7 +187,7 @@ class Effects:
                 drawn += 1
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{player.accessorName} drew {drawn} card(s)."
         ))
@@ -195,7 +195,7 @@ class Effects:
             player.pending_discard += num
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} must discard {player.pending_discard} card(s)."
             ))
@@ -206,7 +206,7 @@ class Effects:
         self.game.recalculateStats(self.game.isPlaying)
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{player.accessorName} covers for {amount} Tenacity."
         ))
@@ -216,7 +216,7 @@ class Effects:
         player.shield_active = True
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{player.accessorName} activates Shield! Next hit will be blocked."
         ))
@@ -226,7 +226,7 @@ class Effects:
         player.deflect_val = amount
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{player.accessorName} prepares to Deflect (+{amount} Tenacity on hit)"
         ))
@@ -240,7 +240,7 @@ class Effects:
             dmg = player.currentPower
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} has a 2H Weapon, so Skullsplitter will activate if it hits."
             ))
@@ -249,21 +249,21 @@ class Effects:
                 target.tactical_silenced = True
                 self.game.logs.append(LogEntry(
                     self.game.turn,
-                    self.game.players[self.game.isPlaying].id,
+                    self.game.isPlaying,
                     self.game.phase,
                     f"{player.accessorName} hits! {target.accessorName} is silenced."
                 ))
             else:
                 self.game.logs.append(LogEntry(
                     self.game.turn,
-                    self.game.players[self.game.isPlaying].id,
+                    self.game.isPlaying,
                     self.game.phase,
                     f"{player.accessorName} missed! Skullsplitter failed."
                 ))
         else:
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} does not have a 2H weapon, so Skullsplitter failed."
             ))
@@ -278,7 +278,7 @@ class Effects:
             player.temp_stats['Power'] += 2
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} activates Battlemaster, choosing +2 Power."
             ))
@@ -286,7 +286,7 @@ class Effects:
             player.temp_stats['Tenacity'] += 5
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} activates Battlemaster, choosing +5 Tenacity."
             ))
@@ -296,7 +296,7 @@ class Effects:
         self.playCounter("Kai", 3)
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{self.game.players[self.game.isPlaying].accessorName} plays Kai! Next three actions will use Power stat for scaling."
         ))
@@ -306,7 +306,7 @@ class Effects:
         target.statuses.append("Nullified")
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[self.game.isPlaying].id,
+            self.game.isPlaying,
             self.game.phase,
             f"{self.game.players[self.game.isPlaying].accessorName} nullifies {target.accessorName}'s first action."
         ))
@@ -317,14 +317,14 @@ class Effects:
             player.hasTacticalAction = True
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} regains their Tactical Action."
             ))
         else:
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} already has their Tactical Action."
             ))
@@ -364,7 +364,7 @@ class Effects:
             clean_name = set_name.replace('"', '')
             self.game.logs.append(LogEntry(
                 self.game.turn,
-                self.game.players[self.game.isPlaying].id,
+                self.game.isPlaying,
                 self.game.phase,
                 f"{player.accessorName} completes the set {clean_name}!"
             )) # Optional verbose log

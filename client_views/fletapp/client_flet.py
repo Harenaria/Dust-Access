@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import override
+from typing import override, Any
 
 from flet import app
 from flet.core.column import Column
@@ -18,6 +18,7 @@ from client_views.fletapp.locals.en_US import en_US
 from client_views.fletapp.views.board_views import BoardView
 from client_views.fletapp.views.lobby_views import HomeView, DeployView
 from client_views.view_interface import ViewInterface
+from core.enums import Actions
 from core.game import Game
 from networking.utils import CSActions, setup_logging, get_opponent_name
 
@@ -149,7 +150,20 @@ class FletClient(ViewInterface):
             # We need to fetch decks immediately
             self._page.run_task(self.get_decks)
         elif route == "/game":
-            board_view = BoardView(self._page, localization=self.localization, room_code=self.client.room_name, initial_state=self._latest_game_state)
+            i = 0
+            if self.last_lobby_data and "players" in self.last_lobby_data:
+                for p in self.last_lobby_data["players"]:
+                    if p["id"] == self.client.client_id:
+                        i = p["index"]
+                        break
+            board_view = BoardView(
+                self._page,
+                localization=self.localization,
+                room_code=self.client.room_name,
+                on_action=self.handle_game_action,
+                initial_state=self._latest_game_state,
+                p_id= i
+            )
             self._page.views.append(board_view)
 
         self._page.update()
@@ -158,6 +172,20 @@ class FletClient(ViewInterface):
         self._page.views.pop()
         top_view = self._page.views[-1]
         self._page.go(top_view.route)
+
+
+    async def handle_game_action(self, action: Actions, payload: dict[str, Any]):
+        """
+        Receives actions and forwards them to the Server.
+        """
+        print(f"[CONTROLLER] Sending Action: {action.name} | Payload: {payload}")
+        # We use the generic send_action from ViewInterface.
+        await self.send_action(
+            room=self.client.room_name,
+            action_type=CSActions.ACTION_EXECUTED,
+            game_action=action,
+            args=payload
+        )
 
     async def send_join_request(self, room_code: str):
         await self.send_action(room_code, CSActions.JOIN,None, self.client.client_id)
@@ -256,15 +284,15 @@ class FletClient(ViewInterface):
 
                 self._page.go("/home")
 
-        self._page.overlay.append(
-                View(controls=[
-                    SnackBar(
-                        content=Text(error, color=AppTheme.COLOR_FG, font_family='Noto Sans', weight=FontWeight.BOLD),
-                        bgcolor=AppTheme.BLUE_3,
-                        open=True
-                    )
-                ])
+        snack = SnackBar(
+            content=Text(error, color=AppTheme.COLOR_FG, font_family='Noto Sans', weight=FontWeight.BOLD),
+            bgcolor=AppTheme.RED,  # Changed to RED for better error visibility
+            open=True
         )
+
+        self._page.open(snack)
+        self._page.update()
+
     async def show_info(self, info_msg: str): pass
 
     @override
