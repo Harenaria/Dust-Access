@@ -138,10 +138,12 @@ Un turno si compone delle seguenti fasi:
    **Azione Tattica (Scegline una):**
    - Attivare una Skill o un instant skill pronta sul campo (poi va in ricarica).
    - Equipaggiare un oggetto dalla mano (o sostituirne uno esistente).
+   - Attivare un oggetto equipaggiato (escluso Arma o Mano Secondaria).
    - *Se la Skill attivata ha una Chain valida, la seconda skill può essere attivata gratuitamente.*
    
-   **Azione di Combattimento:**
+   **Azione di Combattimento (Scegline una):**
    - Eseguire l'Attacco dell'arma equipaggiata: Se nessuna arma è equipaggiata, si può eseguire "un colpo base" che fa sempre 1 danno e conta come colpo mancato.
+   - Attivare l'Arma o la Mano Secondaria equipaggiata.
    > Inoltre, in questa fase è possibile attivare i trucchetti giocandoli direttamente dalla mano senza costi.
 5. **Fase di fine turno:** 
    - Si attivano gli effetti "alla fine del turno".

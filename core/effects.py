@@ -11,7 +11,7 @@ EFFECT_CONSTANTS = {
     "Efficiency": "Efficiency",
     "Sensitivity": "Sensitivity",
     "Durability": "Durability",
-    "Empathy": "Sensitivity", #For legacy name support
+    "Empathy": "Sensitivity",  # For legacy name support
     "LINEAR": Scaling.LINEAR,
     "MULTIPLICATIVE": Scaling.MULTIPLICATIVE,
     "OFF_HAND": CardType.OFF_HAND,
@@ -22,6 +22,7 @@ EFFECT_CONSTANTS = {
     "Medium": "Medium",
     "Light": "Light"
 }
+
 
 class Effects:
     def __init__(self):
@@ -103,19 +104,17 @@ class Effects:
             ))
         self.logger.error(message)
 
-
     def playCounter(self, counterName, num):
         # Fix for CSV parsing sometimes keeping double quotes
         counterName = counterName.replace('"', '')
-        active_player_idx = self.game.isPlaying
         for _ in range(num):
-            self.game.players[active_player_idx].counters.append(counterName)
-        self.game.recalculateStats(active_player_idx)
+            self.game.players[self.game.isPlaying].counters.append(counterName)
+        self.game.recalculateStats(self.game.isPlaying)
         self.game.logs.append(LogEntry(
             self.game.turn,
-            self.game.players[active_player_idx].id,
+            self.game.isPlaying,
             self.game.phase,
-            f"{self.game.players[active_player_idx].accessorName} played {counterName} x{num}."
+            f"{self.game.players[self.game.isPlaying].accessorName} played {counterName} x{num}."
         ))
 
     def removeAllCounters(self, counterName: str):
@@ -218,8 +217,19 @@ class Effects:
             self.game.turn,
             self.game.isPlaying,
             self.game.phase,
-            f"{player.accessorName} activates Shield! Next hit will be blocked."
+            f"{player.accessorName} activates Shield! Your first damage Action you are the target of misses."
         ))
+
+    def RemoveShield(self):
+        player = self.game.players[self.game.isPlaying]
+        if player.shield_active:
+            player.shield_active = False
+            self.game.logs.append(LogEntry(
+                self.game.turn,
+                self.game.isPlaying,
+                self.game.phase,
+                f"{player.accessorName}'s Shield has expired."
+            ))
 
     def Deflect(self, amount: int):
         player = self.game.players[self.game.isPlaying]
@@ -268,47 +278,56 @@ class Effects:
                 f"{player.accessorName} does not have a 2H weapon, so Skullsplitter failed."
             ))
 
-    def Battlemaster(self):
+    def TempStat(self, stat: str, amount: int):
+        """Apply temporary stat bonus until end of turn. Replaces old Battlemaster logic."""
         player = self.game.players[self.game.isPlaying]
-        # Retrieve choice from Game
-        args = getattr(self.game, 'current_action_args', {})
-        choice = int(args.get('choice', 0))
+        # Ensure stat name is clean
+        stat = stat.replace('"', '').replace("'", "").strip()
 
-        if choice == 0:
-            player.temp_stats['Power'] += 2
-            self.game.logs.append(LogEntry(
-                self.game.turn,
-                self.game.isPlaying,
-                self.game.phase,
-                f"{player.accessorName} activates Battlemaster, choosing +2 Power."
-            ))
-        else:
-            player.temp_stats['Tenacity'] += 5
-            self.game.logs.append(LogEntry(
-                self.game.turn,
-                self.game.isPlaying,
-                self.game.phase,
-                f"{player.accessorName} activates Battlemaster, choosing +5 Tenacity."
-            ))
+        if stat not in player.temp_stats:
+            self._log_error(f"Invalid stat for TempStat: {stat}")
+            return
+
+        player.temp_stats[stat] += amount
+        self.game.logs.append(LogEntry(
+            self.game.turn,
+            self.game.isPlaying,
+            self.game.phase,
+            f"{player.accessorName} gains +{amount} temporary {stat}."
+        ))
         self.game.recalculateStats(self.game.isPlaying)
 
-    def Kai(self):
-        self.playCounter("Kai", 3)
-        self.game.logs.append(LogEntry(
-            self.game.turn,
-            self.game.isPlaying,
-            self.game.phase,
-            f"{self.game.players[self.game.isPlaying].accessorName} plays Kai! Next three actions will use Power stat for scaling."
-        ))
+    def Battlemaster(self):
+        """Legacy support - redirects to TempStat based on choice"""
+        args = getattr(self.game, 'current_action_args', {})
+        choice = int(args.get('choice', 0))
+        if choice == 0:
+            self.TempStat("Power", 2)
+        else:
+            self.TempStat("Tenacity", 5)
+
 
     def NullifyFirstAction(self):
-        target = self.game.players[1 - self.game.isPlaying]
-        target.statuses.append("Nullified")
+        # This is now called at the start of the turn for the person who is Nullified.
+        # We must check if the person who DID the bash (the opponent) STILL has an Off-Hand.
+        player = self.game.players[self.game.isPlaying]
+        opponent = self.game.players[1 - self.game.isPlaying]
+        
+        if opponent.equippedCards.get(CardType.OFF_HAND) is None:
+            self.game.logs.append(LogEntry(
+                self.game.turn,
+                self.game.isPlaying,
+                self.game.phase,
+                f"Nullification failed: {opponent.accessorName} no longer has an Off-Hand equipped!"
+            ))
+            return
+
+        player.counters.append("Nullified")
         self.game.logs.append(LogEntry(
             self.game.turn,
             self.game.isPlaying,
             self.game.phase,
-            f"{self.game.players[self.game.isPlaying].accessorName} nullifies {target.accessorName}'s first action."
+            f"{player.accessorName} is Nullified by {opponent.accessorName}'s Shield Bash!"
         ))
 
     def ifUsedBonusRegain(self):
@@ -362,17 +381,137 @@ class Effects:
 
         if count >= 2:
             clean_name = set_name.replace('"', '')
-            self.game.logs.append(LogEntry(
-                self.game.turn,
-                self.game.isPlaying,
-                self.game.phase,
-                f"{player.accessorName} completes the set {clean_name}!"
-            )) # Optional verbose log
-            if f"Set: {set_name}" not in player.statuses:
-                player.statuses.append(f"Set: {set_name}")
-            match clean_name:
-                case "Valor":
-                    player.currentPower += 2
-                    player.currentTenacity += 2
+            if f"Set: {clean_name}" not in player.counters:
+                player.counters.append(f"Set: {clean_name}")
+                self.game.logs.append(LogEntry(
+                    self.game.turn,
+                    self.game.isPlaying,
+                    self.game.phase,
+                    f"{player.accessorName} completes the set {clean_name}!"
+                ))
         else:
-            player.statuses.remove(f"Set: {set_name}")
+            clean_name = set_name.replace('"', '')
+            if f"Set: {clean_name}" in player.counters:
+                player.counters.remove(f"Set: {clean_name}")
+
+    # --- Specialization "Game Begins" Effects ---
+
+    @staticmethod
+    def _find_candidates(player, max_level, types_list=None, card_name=None):
+        """Centralized helper to find matching cards in player's deck."""
+        # Normalize types_list to lowercase for comparison
+        lower_types = [t.lower() for t in types_list] if types_list else []
+        candidates = []
+        for c in player.deck.cards:
+            if c.level > max_level:
+                continue
+            if card_name and c.name.lower() != card_name.lower():
+                continue
+            if lower_types and c.cardType.lower() not in lower_types:
+                continue
+            candidates.append(c)
+        return candidates
+
+    def EquipFromDeck(self, types, max_level, card_name=None):
+        import random
+        player = self.game.players[self.game.isPlaying]
+
+        # Parse types (handle string with || or list)
+        types_list = [t.strip() for t in types.split("||")] if isinstance(types, str) else types
+
+        # Validation: check if all types are equippable
+        equippable = [CardType.WEAPON, CardType.DUAL, CardType.OFF_HAND, 
+                      CardType.HEAD, CardType.CHEST, CardType.BRACERS, CardType.BOOTS]
+        equippable_low = [et.lower() for et in equippable]
+        for t in types_list:
+            if t.lower() not in equippable_low:
+                raise ValueError(f"Type {t} is not an equippable card type.")
+
+        candidates = self._find_candidates(player, max_level, types_list, card_name)
+        
+        if not candidates:
+            # We use the raw input for log for clarity
+            self.game.logs.append(LogEntry(self.game.turn, self.game.isPlaying, self.game.phase, 
+                f"Search: No matching {types} (max lvl {max_level}) found in deck."))
+            return
+
+        if len(candidates) == 1:
+            card = candidates[0]
+            player.deck.cards.remove(card)
+            # Find the correct slot
+            slot = card.cardType
+            if slot == CardType.DUAL or str(slot) == "Dual":
+                slot = CardType.WEAPON
+            
+            player.equippedCards[slot] = card
+            random.shuffle(player.deck.cards)
+            self.game.logs.append(LogEntry(self.game.turn, self.game.isPlaying, self.game.phase, 
+                f"{player.accessorName} reveals and equips {card.name}."))
+            self.game.recalculateStats(self.game.isPlaying)
+        else:
+            player.choice_pending = True
+            player.choice_candidates = candidates
+
+    def LearnFromDeck(self, arg1, arg2=None):
+        import random
+        player = self.game.players[self.game.isPlaying]
+
+        # Robust parsing for: LearnFromDeck(lvl), LearnFromDeck(lvl, name), LearnFromDeck(type, lvl)
+        if arg2 is None:
+            # Case: LearnFromDeck(max_level)
+            max_level = arg1
+            card_name = None
+        elif str(arg1).isdigit():
+            # Case: LearnFromDeck(max_level, card_name)
+            max_level = int(arg1)
+            card_name = arg2
+        else:
+            # Case: LearnFromDeck("Skill", max_level) - Old style compatibility
+            max_level = arg2
+            card_name = None
+
+        # Inferred types for learning
+        types_list = [CardType.SKILL, CardType.INSTANT]
+        
+        candidates = self._find_candidates(player, max_level, types_list, card_name)
+        
+        if not candidates: return
+
+        if len(candidates) == 1:
+            card = candidates[0]
+            player.deck.cards.remove(card)
+            # Find empty skill slot
+            for i in range(len(player.skillSlots)):
+                if player.skillSlots[i] is None:
+                    player.skillSlots[i] = card
+                    break
+            random.shuffle(player.deck.cards)
+            self.game.logs.append(LogEntry(self.game.turn, self.game.isPlaying, self.game.phase, 
+                f"{player.accessorName} reveals and learns {card.name}."))
+            self.game.recalculateStats(self.game.isPlaying)
+        else:
+            player.choice_pending = True
+            player.choice_candidates = candidates
+
+    def DrawFromDeck(self, types, max_level, card_name=None):
+        import random
+        player = self.game.players[self.game.isPlaying]
+        
+        # Parse types (handle string with || or list)
+        types_list = [t.strip() for t in types.split("||")] if isinstance(types, str) else types
+        
+        candidates = self._find_candidates(player, max_level, types_list, card_name)
+        
+        if not candidates: return
+
+        if len(candidates) == 1:
+            card = candidates[0]
+            player.deck.cards.remove(card)
+            player.hand.append(card)
+            random.shuffle(player.deck.cards)
+            self.game.logs.append(LogEntry(self.game.turn, self.game.isPlaying, self.game.phase, 
+                f"{player.accessorName} reveals and draws {card.name}."))
+            self.game.recalculateStats(self.game.isPlaying)
+        else:
+            player.choice_pending = True
+            player.choice_candidates = candidates

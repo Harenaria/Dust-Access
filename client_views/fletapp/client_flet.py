@@ -15,7 +15,7 @@ from flet.core.view import View
 from client_views.fletapp.locals.locale import Locale
 from client_views.fletapp.apptheme import AppTheme
 from client_views.fletapp.locals.en_US import en_US
-from client_views.fletapp.views.board_views import BoardView
+from client_views.fletapp.views.game_views import BoardView
 from client_views.fletapp.views.lobby_views import HomeView, DeployView
 from client_views.view_interface import ViewInterface
 from core.enums import Actions
@@ -32,6 +32,7 @@ class FletClient(ViewInterface):
         self.localization:Locale = en_US
         #UI Setup
         self._page.theme_mode = ThemeMode.DARK
+        self._page.bgcolor = AppTheme.COLOR_BG
         self._page.title = "Dust Access"
         self._page.fonts = {
             "Noto Sans": "fonts/NotoSans.ttf",
@@ -127,6 +128,7 @@ class FletClient(ViewInterface):
         print(f"[ROUTE] Navigating to: {route}")
 
         self._page.views.clear()
+        self._page.bgcolor = AppTheme.COLOR_BG
 
         # ROUTE: HOME
         if route == "/home" or route == "/":

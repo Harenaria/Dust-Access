@@ -27,11 +27,19 @@ class Game(DataclassJSONCapable):
     phase: Phases = Phases.SETUP
     winner: Winner = Winner.NONE
     logs: GameLogger = None
+    spec_effect_triggered: bool = False
 
     def __post_init__(self):
         # Initialize internal logic objects
-        if self.logs is None:
+        if isinstance(self.logs, dict):
+            self.logs = GameLogger.dict_deserializer(self.logs)
+        elif self.logs is None:
             self.logs = GameLogger(self.room, [])
+
+        if isinstance(self.phase, str):
+            self.phase = Phases[self.phase] if self.phase in Phases.__members__ else Phases(self.phase)
+        if isinstance(self.winner, str):
+            self.winner = Winner[self.winner] if self.winner in Winner.__members__ else Winner(self.winner)
 
         self.effectResolver = Effects()
         self.current_action_args = {}
@@ -122,8 +130,9 @@ class Game(DataclassJSONCapable):
         if self.winner != Winner.NONE:
             return {"valid": False, "error": "Game Over"}
 
-        if player != self.isPlaying:
-            return {"valid": False, "error": "Not your turn"}
+        if player != self.isPlaying and self.phase != Phases.SETUP:
+            if action != Actions.CHOOSE_REWARD:
+                return {"valid": False, "error": "Not your turn"}
 
         current_player = self.players[player]
         self.current_action_args = args
@@ -156,11 +165,23 @@ class Game(DataclassJSONCapable):
                     ))
 
                     if self.ready_in_setup[0] and self.ready_in_setup[1]:
+                        if not self.spec_effect_triggered:
+                            self.spec_effect_triggered = True
+                            for i in range(2):
+                                p = self.players[i]
+                                if p.specialization.onGameBegins:
+                                    old_p = self.isPlaying
+                                    self.isPlaying = i
+                                    self.effectResolver.resolve(p.specialization.onGameBegins, self)
+                                    self.isPlaying = old_p
+
+                        if any(p.choice_pending for p in self.players):
+                            return {"valid": True, "message": "Resolve choices first!"}
                         self.isPlaying = 0
                         self.nextPhase()
                         return {"valid": True, "message": "Starting..."}
                     else:
-                        self.isPlaying = 1 - player
+                        # self.isPlaying = 1 - player  <-- Removed to allow simultaneous setup
                         self.logs.append(LogEntry(
                             self.turn,
                             self.isPlaying,
@@ -238,14 +259,15 @@ class Game(DataclassJSONCapable):
                             card = current_player.hand.pop(args['index'])
                             idx = current_player.skillSlots.index(None)
                             current_player.skillSlots[idx] = card
-                            card.currentCD = 0
-                            self.effectResolver.resolve(card.OnPlay, self)
+                            # Handle multi-effect cards with choice
+                            if not(self.multi_effect_resolver(args, card)): return {"valid": False, "error": "Invalid choice"}
                             self.logs.append(LogEntry(
                                 self.turn,
                                 self.isPlaying,
                                 self.phase,
                                 f"{current_player.accessorName} placed {card.name} in slot {idx + 1}."
                             ))
+                            self._schedule_future_effects(player, card)
                             return {"valid": True}
                         else:
                             return {"valid": False, "error": "Skill slots full. Remove one first."}
@@ -268,7 +290,8 @@ class Game(DataclassJSONCapable):
                         card = current_player.hand.pop(args['index'])
                         if card.level > self.players[player].level:
                             return {"valid": False, "error": "Level too low"}
-                        self.effectResolver.resolve(card.OnPlay, self)
+                        # Handle multi-effect cards with choice
+                        if not(self.multi_effect_resolver(args, card)): return {"valid": False, "error": "Invalid choice"}
                         self.logs.append(LogEntry(
                             self.turn,
                             self.isPlaying,
@@ -277,6 +300,7 @@ class Game(DataclassJSONCapable):
                         ))
                         # Cantrips do not consume action, update stats just in case
                         self.recalculateStats(player)
+                        self._schedule_future_effects(player, card)
                         return {"valid": True}
                     else:
                         return {"valid": False, "error": "Can only play Cantrips in Duel Phase"}
@@ -307,7 +331,8 @@ class Game(DataclassJSONCapable):
                 else:
                     current_player.equippedCards[real_card.cardType.value] = real_card
 
-                self.effectResolver.resolve(real_card.OnPlay, self)
+                # Handle multi-effect cards with choice
+                if not(self.multi_effect_resolver(args, card)): return {"valid": False, "error": "Invalid choice"}
                 self.recalculateStats(player)
                 current_player.hasTacticalAction = False
 
@@ -317,6 +342,7 @@ class Game(DataclassJSONCapable):
                     self.phase,
                     f"{current_player.accessorName} equipped {real_card.name}."
                 ))
+                self._schedule_future_effects(player, real_card)
                 return {"valid": True}
 
             case Actions.ACTIVATE:
@@ -336,6 +362,12 @@ class Game(DataclassJSONCapable):
                         idx = args.get('index')
                         target_card = current_player.skillSlots[idx]
                         if target_card is not None and target_card.cardType != CardType.INSTANT:
+                            current_player.hasTacticalAction = False
+                    elif source_type == 'EQUIP':
+                        slot = args.get('slot')
+                        if slot in [CardType.WEAPON, CardType.OFF_HAND]:
+                            current_player.hasCombatAction = False
+                        else:
                             current_player.hasTacticalAction = False
                     return {"valid": True}
 
@@ -368,23 +400,45 @@ class Game(DataclassJSONCapable):
                     target_card = current_player.skillSlots[idx]
                     if target_card is None: return {"valid": False, "error": "Slot empty"}
                     if target_card.currentCD > 0: return {"valid": False, "error": "Skill in Cooldown"}
+                    
+                    is_chained = (current_player.chainedSkillName == target_card.name)
 
-                    if not current_player.hasTacticalAction and target_card.cardType != CardType.INSTANT:
+                    if not current_player.hasTacticalAction and target_card.cardType != CardType.INSTANT and not is_chained:
                         return {"valid": False, "error": "No Tactical Actions left"}
 
-                    self.effectResolver.resolve(target_card.OnActivate, self)
+                    # Handle multi-effect cards with choice
+                    effect_field = "OnChainActivate" if is_chained and target_card.OnChainActivate else "OnActivate"
+                    if not(self.multi_effect_resolver(args, target_card, effect_field)): return {"valid": False, "error": "Invalid choice"}
+                    
+                    # Update chain
+                    current_player.chainedSkillName = getattr(target_card, 'ChainsWith', "")
                     self.logs.append(LogEntry(
                         self.turn,
                         self.isPlaying,
                         self.phase,
-                        f"{current_player.accessorName} activated {target_card.name}!"
+                        f"{current_player.accessorName} activated {target_card.name}!" + (" (Chained!)" if is_chained else "")
                     ))
+                    self._schedule_future_effects(player, target_card)
 
                 elif source_type == 'EQUIP':
                     slot = args.get('slot')
                     target_card = self.players[player].equippedCards[slot]
+                    if target_card is None: return {"valid": False, "error": "Slot empty"}
+
+                    if slot in [CardType.WEAPON, CardType.OFF_HAND]:
+                        if not current_player.hasCombatAction: return {"valid": False, "error": "No Combat Actions left"}
+                    else:
+                        if not current_player.hasTacticalAction: return {"valid": False, "error": "No Tactical Actions left"}
+
                     if slot is not None:
-                        self.effectResolver.resolve(target_card.OnActivate, self)
+                        # Handle multi-effect cards with choice
+                        if target_card.ChoiceLabels and len(target_card.OnActivate) > 1:
+                            choice = args.get('choice', 0)
+                            if 0 <= choice < len(target_card.OnActivate):
+                                self.effectResolver.resolve(target_card.OnActivate[choice], self)
+                        else:
+                            for effect in target_card.OnActivate:
+                                self.effectResolver.resolve(effect, self)
                         self.logs.append(LogEntry(
                             self.turn,
                             self.isPlaying,
@@ -398,7 +452,10 @@ class Game(DataclassJSONCapable):
                 # Cooldown & Cost
                 target_card.currentCD = target_card.cd  # Use 'cd' from property
                 if target_card.cardType != CardType.INSTANT:
-                    current_player.hasTacticalAction = False
+                    if source_type == 'EQUIP' and slot in [CardType.WEAPON, CardType.OFF_HAND]:
+                        current_player.hasCombatAction = False
+                    else:
+                        current_player.hasTacticalAction = False
 
                 self.recalculateStats(player)
                 return {"valid": True}
@@ -444,8 +501,67 @@ class Game(DataclassJSONCapable):
                 self.recalculateStats(player)
                 return {"valid": True}
 
+            case Actions.CHOOSE_REWARD:
+                if not current_player.choice_pending:
+                    return {"valid": False, "error": "No choice pending"}
+                
+                card_name = args.get('card_name')
+                # Find in candidates
+                card = next((c for c in current_player.choice_candidates if c.name == card_name), None)
+                if not card:
+                    return {"valid": False, "error": "Invalid choice"}
+
+                # Resolve based on card type and usual effect logic
+                # Handling all equippable types, with DUAL redirection
+                equippable = [CardType.WEAPON, CardType.DUAL, CardType.OFF_HAND, 
+                              CardType.HEAD, CardType.CHEST, CardType.BRACERS, CardType.BOOTS]
+                
+                if card.cardType in equippable:
+                    slot = card.cardType
+                    if slot == CardType.DUAL:
+                        slot = CardType.WEAPON
+                    current_player.equippedCards[slot] = card
+                    self.logs.append(LogEntry(self.turn, player, self.phase, f"{current_player.accessorName} reveals and equips {card.name}."))
+                elif card.cardType == CardType.SKILL or card.cardType == CardType.INSTANT:
+                     for i in range(len(current_player.skillSlots)):
+                         if current_player.skillSlots[i] is None:
+                             current_player.skillSlots[i] = card
+                             break
+                     self.logs.append(LogEntry(self.turn, player, self.phase, f"{current_player.accessorName} reveals and learns {card.name}."))
+                elif card.cardType == CardType.CANTRIP:
+                     current_player.hand.append(card)
+                     self.logs.append(LogEntry(self.turn, player, self.phase, f"{current_player.accessorName} reveals and draws {card.name}."))
+
+                current_player.deck.cards.remove(card)
+                import random
+                random.shuffle(current_player.deck.cards)
+                
+                current_player.choice_pending = False
+                current_player.choice_candidates = []
+                self.recalculateStats(player)
+
+                # If both are done AND both ready in setup, advance
+                if not any(p.choice_pending for p in self.players) and self.phase == Phases.SETUP and all(self.ready_in_setup):
+                    self.nextPhase()
+                return {"valid": True}
+
             case _:
                 return {"valid": False, "error": "Action not implemented"}
+
+    def multi_effect_resolver(self, args: dict[str, Any], real_card, effect_field="OnPlay"):
+        effects = getattr(real_card, effect_field, [])
+        if not effects: return True 
+
+        if real_card.ChoiceLabels and len(effects) > 1:
+            choice = args.get('choice', 0)
+            if 0 <= choice < len(effects):
+                self.effectResolver.resolve(effects[choice], self)
+            else:
+                return False
+        else:
+            for effect in effects:
+                self.effectResolver.resolve(effect, self)
+        return True
 
     # -------------------------------------------HANDLERS----------------------------------------------
     def _handle_start_phase_logic(self):
@@ -455,6 +571,7 @@ class Game(DataclassJSONCapable):
         player.level = min(10, (self.turn + 1) // 2)
 
         player.temp_stats = {'Power': 0, 'Tenacity': 0, 'Efficiency': 0, 'Sensitivity': 0, 'Durability': 0}
+        player.chainedSkillName = ""
         player.shield_active = False
         player.deflect_val = 0
 
@@ -491,6 +608,14 @@ class Game(DataclassJSONCapable):
         else:
             player.hasTacticalAction = True
         player.hasCombatAction = True
+
+        # Process Pending Effects
+        current_turn = self.turn
+        to_execute = [e for e in player.pending_effects if e['turn'] == current_turn]
+        player.pending_effects = [e for e in player.pending_effects if e['turn'] > current_turn]
+
+        for effect_data in to_execute:
+            self.effectResolver.resolve(effect_data['effect'], self)
 
     def _handle_loot_phase_logic(self):
         player = self.players[self.isPlaying]
@@ -565,7 +690,7 @@ class Game(DataclassJSONCapable):
                 self.turn,
                 self.isPlaying,
                 self.phase,
-                f"{opponent.accessorName}'s attack has been absorbed by {opponent.accessorName}'s shield!"
+                f"{self.players[player].accessorName}'s attack has been absorbed by {opponent.accessorName}'s shield!"
             ))
             return 0, False  # 0 Dmg, Miss
 
@@ -618,11 +743,17 @@ class Game(DataclassJSONCapable):
             match counter:
                 case Counter.RAGE:
                     self.players[player].currentPower += 1
+                case Counter.VALOR:
+                    self.players[player].currentPower += 2
+                    self.players[player].currentTenacity += 2
                 case _:
                     pass
 
     def recalculateStats(self, player: int):
         p = self.players[player]
+
+        # Temporarily remove set-based counters so they can be re-added if still valid
+        p.counters = [c for c in p.counters if not c.startswith("Set: ")]
 
         p.currentPower = p.specialization.power
         p.currentTenacity = p.specialization.tenacity
@@ -691,4 +822,35 @@ class Game(DataclassJSONCapable):
             self.phase,
             f"{p.accessorName} draws their initial hand."
         ))
+
         return {"valid": True}
+    def _schedule_future_effects(self, player_idx: int, card):
+        """Schedules effects for future turns based on OnNextTurn and OnNextPlayerTurn fields."""
+        if not card: return
+        
+        # OnNextPlayerTurn: next turn (n+1)
+        if hasattr(card, 'OnNextPlayerTurn') and card.OnNextPlayerTurn:
+            target_idx = 1 - player_idx
+            self.players[target_idx].pending_effects.append({
+                'effect': card.OnNextPlayerTurn,
+                'turn': self.turn + 1
+            })
+            self.logs.append(LogEntry(
+                self.turn,
+                self.isPlaying,
+                self.phase,
+                f"Effect scheduled for {self.players[target_idx].accessorName}'s next turn."
+            ))
+
+        # OnNextTurn: turn after next (n+2)
+        if hasattr(card, 'OnNextTurn') and card.OnNextTurn:
+            self.players[player_idx].pending_effects.append({
+                'effect': card.OnNextTurn,
+                'turn': self.turn + 2
+            })
+            self.logs.append(LogEntry(
+                self.turn,
+                self.isPlaying,
+                self.phase,
+                f"Effect scheduled for {self.players[player_idx].accessorName} in 2 turns."
+            ))

@@ -17,7 +17,7 @@ DATA_DIR = os.path.join(project_root, "data")
 
 
 def get_available_specializations(deck_id=None) -> dict[str,str]:
-    DEFAULT_SPECS = {"Scraper": "Heavy", "Crawler": "Medium", "Querist": "Light<"}
+    DEFAULT_SPECS = {"Scraper": "Heavy", "Crawler": "Medium", "Querist": "Light"}
     if deck_id is not None:
         try:
             deck_specs = get_deck_base_specializations(int(deck_id))

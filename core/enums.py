@@ -18,6 +18,7 @@ class Actions(Enum):
     ACTIVATE = auto()
     ATTACK = auto()
     END_TURN = auto()
+    CHOOSE_REWARD = auto()
 
 class Winner(Enum):
     NONE = 0
@@ -41,6 +42,7 @@ class CardType(StrEnum):
     SKILL = 'Skill'
     INSTANT = 'Instant'
     CANTRIP = 'Cantrip'
+    COUNTER = 'Counter'
 class Stats(StrEnum):
     DURABILITY = 'Durability'
     POWER = 'Power'
@@ -51,6 +53,7 @@ class Scaling(StrEnum):
     LINEAR = 'LINEAR'
     MULTIPLICATIVE = 'MULTIPLICATIVE'
 class Counter(StrEnum):
+    VALOR = 'Set: Valor'
     KAI = 'Kai'
     RAGE = 'Rage'
     MOMENTUM = 'Momentum'

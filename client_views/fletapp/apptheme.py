@@ -5,7 +5,7 @@ class AppTheme:
     FONTS_DIR = os.path.join(ASSET_DIR, "fonts")
     COLOR_BG = "#000000"
     COLOR_FG = "#FFFFFF"
-    GREY = "#444444"
+    GREY = "#1F1F1F"
     GREEN_LIGHT = "#8CBF26"
     GREEN_DARK = "#339933"
     BLUE_1 = "#00ABA9"

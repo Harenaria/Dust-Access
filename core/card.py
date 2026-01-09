@@ -16,40 +16,43 @@ from core.serialization import DataclassJSONCapable
 # That way we make the card easily understandable without having to search for the basic things!
 
 
-
-@dataclass #it gens a default __init__ (+ other cool things like __repr__, a sort of toString) and makes attributes look like... attributes. And that's good!
+@dataclass  # it gens a default __init__ (+ other cool things like __repr__, a sort of toString) and makes attributes look like... attributes. And that's good!
 class Card(DataclassJSONCapable):
-    name:str
-    Text:str
-    Flavor:str
-    
-    acClass:AccessorClass
-    cardType:CardType
-    level:int
-    cd:int
-    currentCD:int
-    OnPlay:str
-    OnActivate:str
-    OnNextTurn:str
-    OnNextPlayerTurn:str
-    OnRemove:str
-    WhileinPlay:str
+    name: str
+    Text: str
+    Flavor: str
+
+    acClass: AccessorClass
+    cardType: CardType
+    level: int
+    cd: int
+    currentCD: int
+    OnPlay: list  # List of effect strings (split by ||)
+    OnActivate: list  # List of effect strings (split by ||)
+    ChoiceLabels: list  # Labels for multi-choice effects (split by ||)
+    OnNextTurn: str
+    OnNextPlayerTurn: str
+    OnRemove: str
+    WhileinPlay: str
 
     @classmethod
     @override
     def dict_deserializer(cls, data):
-        # 1. Peek at the 'cardType' field in the raw data
+        # Peek at the 'cardType' field in the raw data
         c_type_str = data.get('cardType')
 
-        # 2. Determine the correct subclass
+        # Determine the correct subclass
         target_cls = Card
         if c_type_str in [CardType.WEAPON, CardType.DUAL]:
             target_cls = WeaponCard
+        elif c_type_str == [CardType.HEAD, CardType.CHEST, CardType.BRACERS, CardType.BOOTS, CardType.OFF_HAND]:
+            target_cls = EquipCard
         elif c_type_str in [CardType.SKILL, CardType.INSTANT]:
             target_cls = SkillCard
-        # ... etc ...
+        elif c_type_str == CardType.CANTRIP:
+            target_cls = CantripCard
 
-        # 3. Call the parent implementation, but binding it to the specific subclass
+        # Call the parent implementation, but binding it to the specific subclass
         # This effectively calls WeaponCard.from_dict(data) using the logic we defined in the Mixin
         return super(Card, target_cls).dict_deserializer(data)
 
@@ -75,7 +78,7 @@ class WeaponCard(EquipCard):
 class SkillCard(Card):
     isInstant:bool
     ChainsWith:str
-    OnChainActivate:str
+    OnChainActivate: list
     OnHit:str
     OnMiss:str
 

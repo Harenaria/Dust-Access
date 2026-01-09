@@ -38,7 +38,7 @@ def get_cards_db() -> pd.DataFrame:
                 'CD': 0, 'Level': 1, 'is2Handed': 0,
                 'Text': '', 'Flavor': '', 'OnPlay': '', 'OnActivate': '',
                 'OnHit': '', 'OnMiss': '', 'ChainsWith': '', 'OnChainActivate': '',
-                'WhileinPlay': ''
+                'WhileinPlay': '', 'ChoiceLabels': ''
             }
             df.fillna(defaults, inplace=True)
             _CARDS_DB = df
@@ -120,6 +120,9 @@ class Deck(DataclassJSONCapable):
             elif c_type == enums.CardType.CANTRIP:
                 return card.CantripCard(**data)
 
+            elif c_type == enums.CardType.COUNTER:
+                return card.Card(**data)
+
             else:
                 return card.Card(**data)
         except TypeError:
@@ -190,6 +193,15 @@ class Deck(DataclassJSONCapable):
             if pd.isna(val): return ""
             return str(val)
 
+        def safe_list(val, separator='||'):
+            """Parse ||-separated string into list of effects"""
+            if pd.isna(val) or not val:
+                return []
+            s = str(val).strip()
+            if not s:
+                return []
+            return [part.strip() for part in s.split(separator) if part.strip()]
+
         try:
             c_type = enums.CardType(data['Type'])
         except:
@@ -209,9 +221,12 @@ class Deck(DataclassJSONCapable):
             'level': safe_int(data.get('Level'), 1),
             'cd': safe_int(data.get('CD'), 0),
             'currentCD': 0,
-            'OnPlay': safe_str(data.get('OnPlay')),
-            'OnActivate': safe_str(data.get('OnActivate')),
-            'OnNextTurn': '', 'OnNextPlayerTurn': '', 'OnRemove': '',
+            'OnPlay': safe_list(data.get('OnPlay')),
+            'OnActivate': safe_list(data.get('OnActivate')),
+            'ChoiceLabels': safe_list(data.get('ChoiceLabels')),
+            'OnNextTurn': safe_str(data.get('OnNextTurn')),
+            'OnNextPlayerTurn': safe_str(data.get('OnNextPlayerTurn')),
+            'OnRemove': safe_str(data.get('OnRemove')),
             'WhileinPlay': safe_str(data.get('WhileinPlay'))
         }
 
@@ -252,7 +267,7 @@ class Deck(DataclassJSONCapable):
                 **base_args,
                 isInstant=(c_type == enums.CardType.INSTANT),
                 ChainsWith=safe_str(data.get('ChainsWith')),
-                OnChainActivate=safe_str(data.get('OnChainActivate')),
+                OnChainActivate=safe_list(data.get('OnChainActivate')),
                 OnHit=safe_str(data.get('OnHit')),
                 OnMiss=safe_str(data.get('OnMiss'))
             )

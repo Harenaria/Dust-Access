@@ -33,6 +33,7 @@ class Specialization(DataclassJSONCapable):
     efficiency: int = 0
     tenacity: int = 0
     sensitivity: int = 0
+    onGameBegins: str = ""
 
     @classmethod
     def from_name(cls, name: str):
@@ -51,7 +52,8 @@ class Specialization(DataclassJSONCapable):
             power=int(row.get('Power', 0)),
             efficiency=int(row.get('Efficiency', 0)),
             tenacity=int(row.get('Tenacity', 0)),
-            sensitivity=int(row.get('Sensitivity', 0))
+            sensitivity=int(row.get('Sensitivity', 0)),
+            onGameBegins=str(row.get('OnGameBegins', ""))
         )
 
 @dataclass
@@ -81,10 +83,14 @@ class Player(DataclassJSONCapable):
     })
 
     pending_discard: int = 0
+    choice_pending: bool = False
+    choice_candidates: list = field(default_factory=list)
     statuses: List[str] = field(default_factory=list)
     shield_active: bool = False
     deflect_val: int = 0
     tactical_silenced: bool = False
+    chainedSkillName: str = ""
+    pending_effects: List[Dict[str, Any]] = field(default_factory=list)
 
     equippedCards: Dict[CardType, Any] = field(default_factory=lambda: {
         CardType.HEAD: None, CardType.CHEST: None, CardType.BRACERS: None, CardType.BOOTS: None,
@@ -110,6 +116,10 @@ class Player(DataclassJSONCapable):
         # using the static helper we added to Deck in the previous step
         if self.hand and isinstance(self.hand[0], dict):
             self.hand = [Deck.deserialize_card(c) for c in self.hand]
+
+        # Hydrate Choice Candidates
+        if self.choice_candidates and isinstance(self.choice_candidates[0], dict):
+            self.choice_candidates = [Deck.deserialize_card(c) for c in self.choice_candidates]
 
         # Hydrate Equipped Cards
         for slot, card_data in self.equippedCards.items():

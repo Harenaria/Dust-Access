@@ -88,6 +88,7 @@ def HomeView(page: Page, localization: dict[str, str], on_quick_match, on_create
 
     return View(
         route="/home",
+        bgcolor=AppTheme.COLOR_BG,
         controls=[
             Column(
                 expand=True,
@@ -108,6 +109,8 @@ class DeployView(View):
         self._on_deploy = on_deploy
         self._on_start_game = on_start_game
         self.scroll = None
+
+        self.bgcolor = AppTheme.COLOR_BG
 
         # --- Header ---
         opponent_text: str = localization['waiting_opponent'] if opp_name is None else f"vs. {opp_name}"
