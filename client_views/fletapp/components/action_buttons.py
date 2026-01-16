@@ -62,13 +62,13 @@ class ShowHandButton(ActionButton):
         super().__init__(on_click, Icons.PAN_TOOL, "Hand", None) # UI Action
 class PlaceButton(ActionButton):
     def __init__(self, on_click):
-        super().__init__(on_click, Icons.DOWNLOAD, "Place", Actions.PLAY)
+        super().__init__(on_click, Icons.DOWNLOAD, "Learn", Actions.LEARN)
 class EquipButton(ActionButton):
     def __init__(self, on_click):
         super().__init__(on_click, Icons.ACCESSIBILITY, "Equip", Actions.EQUIP, cost="tactical")
 class CantripButton(ActionButton):
     def __init__(self, on_click):
-        super().__init__(on_click, Icons.WHATSHOT_SHARP, "Cantrip", Actions.PLAY)
+        super().__init__(on_click, Icons.WHATSHOT_SHARP, "Cantrip", Actions.CAST)
 class ActivateButton(ActionButton):
     def __init__(self, on_click):
         super().__init__(on_click, Icons.BOLT_SHARP, "Activate", Actions.ACTIVATE, cost="tactical")

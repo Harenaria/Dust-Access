@@ -38,7 +38,7 @@ def get_cards_db() -> pd.DataFrame:
                 'CD': 0, 'Level': 1, 'is2Handed': 0,
                 'Text': '', 'Flavor': '', 'OnPlay': '', 'OnActivate': '',
                 'OnHit': '', 'OnMiss': '', 'ChainsWith': '', 'OnChainActivate': '',
-                'WhileinPlay': '', 'ChoiceLabels': ''
+                'WhileinPlay': '', 'ChoiceLabels': '', 'Requires': ''
             }
             df.fillna(defaults, inplace=True)
             _CARDS_DB = df
@@ -80,6 +80,9 @@ class Deck(DataclassJSONCapable):
             self._build_from_csv()
         elif self.cards and isinstance(self.cards[0], dict):
             self.cards = [self.deserialize_card(c) for c in self.cards]
+
+    def clone(self):
+        return Deck(self.id, cards=[c.clone() for c in self.cards])
 
     @staticmethod
     def deserialize_card(data: dict):
@@ -227,7 +230,8 @@ class Deck(DataclassJSONCapable):
             'OnNextTurn': safe_str(data.get('OnNextTurn')),
             'OnNextPlayerTurn': safe_str(data.get('OnNextPlayerTurn')),
             'OnRemove': safe_str(data.get('OnRemove')),
-            'WhileinPlay': safe_str(data.get('WhileinPlay'))
+            'WhileinPlay': safe_str(data.get('WhileinPlay')),
+            'Requires': safe_str(data.get('Requires'))
         }
 
         equip_args = {

@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-from typing_extensions import override
-
 from core.enums import AccessorClass, CardType, Stats, Scaling
 from core.serialization import DataclassJSONCapable
 
@@ -34,9 +32,14 @@ class Card(DataclassJSONCapable):
     OnNextPlayerTurn: str
     OnRemove: str
     WhileinPlay: str
+    Requires: str  # Declarative prerequisites DSL (e.g., "2H", "Equip:OFF_HAND", "UsedAction:Tactical")
+
+    def clone(self):
+        import copy
+        return copy.copy(self)
 
     @classmethod
-    @override
+    # @override removed to avoid dependency
     def dict_deserializer(cls, data):
         # Peek at the 'cardType' field in the raw data
         c_type_str = data.get('cardType')
@@ -45,7 +48,7 @@ class Card(DataclassJSONCapable):
         target_cls = Card
         if c_type_str in [CardType.WEAPON, CardType.DUAL]:
             target_cls = WeaponCard
-        elif c_type_str == [CardType.HEAD, CardType.CHEST, CardType.BRACERS, CardType.BOOTS, CardType.OFF_HAND]:
+        elif c_type_str in [CardType.HEAD, CardType.CHEST, CardType.BRACERS, CardType.BOOTS, CardType.OFF_HAND]:
             target_cls = EquipCard
         elif c_type_str in [CardType.SKILL, CardType.INSTANT]:
             target_cls = SkillCard

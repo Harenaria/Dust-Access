@@ -33,14 +33,17 @@ class Effects:
         """
         Parses a string like 'Damage(Power, LINEAR, 1)' and executes the corresponding method.
         """
+        prior_game = self.game
         self.game = game_state
 
         # Basic Validation
         if not effect_str or not isinstance(effect_str, str):
+            self.game = prior_game
             return
 
         clean_str = effect_str.strip().replace('\x00', '')
         if not clean_str or clean_str.lower() == 'nan':
+            self.game = prior_game
             return
 
         # Parse: Split "MethodName(Args)"
@@ -73,7 +76,8 @@ class Effects:
 
         except Exception as e:
             self._log_error(f"Error parsing '{clean_str}': {e}")
-        self.game = None
+        finally:
+            self.game = prior_game
 
     @staticmethod
     def _convert_arg(arg: str) -> Any:
@@ -437,7 +441,16 @@ class Effects:
 
         if len(candidates) == 1:
             card = candidates[0]
-            player.deck.cards.remove(card)
+            try:
+                player.deck.cards.remove(card)
+            except ValueError:
+                found = False
+                for i, c in enumerate(player.deck.cards):
+                    if c.name == card.name and c.cardType == card.cardType and c.level == card.level:
+                        player.deck.cards.pop(i)
+                        found = True
+                        break
+                if not found: raise
             # Find the correct slot
             slot = card.cardType
             if slot == CardType.DUAL or str(slot) == "Dual":
@@ -479,7 +492,16 @@ class Effects:
 
         if len(candidates) == 1:
             card = candidates[0]
-            player.deck.cards.remove(card)
+            try:
+                player.deck.cards.remove(card)
+            except ValueError:
+                found = False
+                for i, c in enumerate(player.deck.cards):
+                    if c.name == card.name and c.cardType == card.cardType and c.level == card.level:
+                        player.deck.cards.pop(i)
+                        found = True
+                        break
+                if not found: raise
             # Find empty skill slot
             for i in range(len(player.skillSlots)):
                 if player.skillSlots[i] is None:
@@ -506,7 +528,16 @@ class Effects:
 
         if len(candidates) == 1:
             card = candidates[0]
-            player.deck.cards.remove(card)
+            try:
+                player.deck.cards.remove(card)
+            except ValueError:
+                found = False
+                for i, c in enumerate(player.deck.cards):
+                    if c.name == card.name and c.cardType == card.cardType and c.level == card.level:
+                        player.deck.cards.pop(i)
+                        found = True
+                        break
+                if not found: raise
             player.hand.append(card)
             random.shuffle(player.deck.cards)
             self.game.logs.append(LogEntry(self.game.turn, self.game.isPlaying, self.game.phase, 
