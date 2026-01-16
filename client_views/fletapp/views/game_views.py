@@ -175,7 +175,7 @@ class BoardView(View):
         
     def _on_hand_dismiss(self, e):
         # Reset selection mode on dismiss if it was a HAND selection
-        if self._current_action in [Actions.EQUIP, Actions.PLAY, Actions.DISCARD, Actions.ACTIVATE]:
+        if self._current_action in [Actions.EQUIP, Actions.LEARN, Actions.CAST, Actions.DISCARD, Actions.ACTIVATE]:
             self._current_action = None
             self._selected_counter = None
             self.update_game(self._game) # Redraw/Revert title
@@ -398,7 +398,7 @@ class BoardView(View):
         action = e.control.data
         if not action: return
         
-        if action in [Actions.EQUIP, Actions.PLAY]:
+        if action in [Actions.EQUIP, Actions.LEARN, Actions.CAST]:
             self._current_action = action
             self._open_hand_sheet(None) # Re-open/Refresh hand
         elif action == Actions.DISCARD:
@@ -449,7 +449,7 @@ class BoardView(View):
     def _execute_with_choice(self, card, action, payload):
         
         choices = []
-        if action == Actions.PLAY and hasattr(card, 'OnPlay') and getattr(card, 'ChoiceLabels', None):
+        if action in [Actions.LEARN, Actions.CAST] and hasattr(card, 'OnPlay') and getattr(card, 'ChoiceLabels', None):
              if len(card.OnPlay) > 1: choices = card.ChoiceLabels
         elif action == Actions.ACTIVATE and hasattr(card, 'OnActivate') and getattr(card, 'ChoiceLabels', None):
              if len(card.OnActivate) > 1: choices = card.ChoiceLabels
@@ -488,13 +488,12 @@ class BoardView(View):
             title = "select a card to equip"
             candidates = [c for c in hand_cards if c.cardType in [CardType.WEAPON, CardType.DUAL, CardType.OFF_HAND,
                                                                  CardType.HEAD, CardType.CHEST, CardType.BRACERS, CardType.BOOTS]]
-        elif self._current_action == Actions.PLAY: # Place/Cantrip
-             title = "select a card to play"
-             # If Phase is Prep, only Skills. If Duel, only Cantrips.
-             if self._game.phase == Phases.PREPARATION:
-                 candidates = [c for c in hand_cards if c.cardType in [CardType.SKILL, CardType.INSTANT, CardType.ADVANCED]]
-             elif self._game.phase == Phases.DUEL:
-                 candidates = [c for c in hand_cards if c.cardType == CardType.CANTRIP]
+        elif self._current_action == Actions.LEARN:
+             title = "select a card to learn"
+             candidates = [c for c in hand_cards if c.cardType in [CardType.SKILL, CardType.INSTANT, CardType.ADVANCED]]
+        elif self._current_action == Actions.CAST:
+             title = "select a card to cast"
+             candidates = [c for c in hand_cards if c.cardType == CardType.CANTRIP]
         elif self._current_action == Actions.DISCARD:
             title = "select a card to discard"
             # All cards valid

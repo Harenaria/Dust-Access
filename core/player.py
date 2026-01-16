@@ -158,3 +158,35 @@ class Player(DataclassJSONCapable):
             currentTenacity=spec.tenacity,
             currentSensitivity=spec.sensitivity
         )
+
+    def clone(self):
+        new_p = Player(
+            isFirstPlayer=self.isFirstPlayer,
+            accessorName=self.accessorName,
+            deck=self.deck.clone(),
+            specialization=self.specialization,
+            level=self.level,
+            currentHP=self.currentHP,
+            currentDurability=self.currentDurability,
+            currentPower=self.currentPower,
+            currentEfficiency=self.currentEfficiency,
+            currentTenacity=self.currentTenacity,
+            currentSensitivity=self.currentSensitivity,
+            hasTacticalAction=self.hasTacticalAction,
+            hasCombatAction=self.hasCombatAction,
+            hand=[c.clone() for c in self.hand],
+            counters=list(self.counters),
+            temp_stats=dict(self.temp_stats),
+            pending_discard=self.pending_discard,
+            choice_pending=self.choice_pending,
+            choice_candidates=[c.clone() for c in self.choice_candidates],
+            statuses=list(self.statuses),
+            shield_active=self.shield_active,
+            deflect_val=self.deflect_val,
+            tactical_silenced=self.tactical_silenced,
+            chainedSkillName=self.chainedSkillName,
+            pending_effects=[dict(e) for e in self.pending_effects],
+            equippedCards={k: (v.clone() if v else None) for k, v in self.equippedCards.items()},
+            skillSlots=[(s.clone() if s else None) for s in self.skillSlots]
+        )
+        return new_p
