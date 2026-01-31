@@ -496,18 +496,33 @@ def get_ai_summary(report_data, api_key):
             avg = fun_df['FunScore'].mean() if not fun_df.empty else 0
             fun_summary += f"- {t} Meta Fun Score: {avg:.1f}/100\n"
 
+    # Game Rules
+    rules = ""
+
+    fname = f"rules.md"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(script_dir, "..", "docs", fname)
+
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            rules = f.read()
+
     # --- 2. THE PROMPT ENGINEERING ---
 
     data_block = "\n".join(sorted(card_report_lines))
 
     prompt = f"""
-    You are the Lead Balance Designer for 'Dust Access'. You are writing the 'Developer Commentary' for the next patch.
+    You are the Lead Balance Designer for 'Dust Access', an Expandable Card Game with deckbuilding. 
+    We are doing automatic playtests of the structure decks using MCTS AI bots, and you are writing a bullet point list of things that the other Game Designers should change to fix the game's balance.
+
+    GAME RULES:
+    {rules}
 
     OBJECTIVE:
     Analyze the provided Tiered Simulation Data to identify critical balance issues.
     The data compares "Casual" (Low Skill simulation) vs "Competitive" (High Skill simulation).
     Values shown are **Efficiency** (Winrate relative to expected baseline).
-    +10% is Very Strong. +20% is Broken. -10% is Weak.
+    +5% is Very Strong. +10% is Broken. -5% is Weak. -10% is Useless.
 
     DATA TABLE:
     {data_block}
@@ -516,22 +531,15 @@ def get_ai_summary(report_data, api_key):
     {fun_summary}
 
     INSTRUCTIONS:
-    Write a report in the following Markdown format:
+    Write a report as a simple bullet point list. It should contain short phrases which will contain the following informations:
 
-    ### 1. Meta Health Overview
     *   Is the game fun? (Comment on Fun Scores).
     *   Is the skill gap healthy? (Are there cards that reward Competitive play?).
-
-    ### 2. The "Problem Cards" (Nerf List)
     *   Identify the **UNIVERSAL THREATS** (High efficiency in BOTH Casual and Competitive). These need nerfs.
     *   Identify **NOOB STOMPERS** (High efficiency in Casual, Normal/Low in Competitive). Decide if they are problematic or just part of the learning curve.
     *   **Action:** Propose specific nerfs (e.g., "Increase Cost", "Reduce Damage").
-
-    ### 3. The "Buff List"
     *   Identify cards that are negative efficiency across the board.
     *   **Action:** Propose buffs to make them viable.
-
-    ### 4. Projected Impact
     *   For your suggested changes, explicitly state how they will affect the Casual Meta vs the Competitive Meta.
     *   *Example:* "Nerfing 'Big Club' will save Casual players from frustration but might lower the winrate of Aggro decks in Competitive by 2%."
 
@@ -550,7 +558,7 @@ def get_ai_summary(report_data, api_key):
         return f"## AI Generation Error\nCould not generate report: {str(e)}"
 
 
-def api_key(filename=".gemini_api"):
+def gemini_api_key(filename=".gemini_api"):
     """
        Reads the Gemini API Key from a local file.
        Searches in the current directory and the parent directory (Project Root).
@@ -564,8 +572,8 @@ def api_key(filename=".gemini_api"):
         filepath = os.path.join(path, filename)
         if os.path.exists(filepath):
             try:
-                with open(filepath, 'r') as f:
-                    key = f.read().strip()
+                with open(filepath, 'r') as filename:
+                    key = filename.read().strip()
                     # Basic validation: API keys usually start with 'AIza'
                     if key.startswith("AIza"):
                         return key

@@ -109,7 +109,7 @@ Nullified: The first time they use an Action, it has no effect.
 Furious Fencing,Heavy,Instant,,5,,,,,,,,,,,,"Damage(Efficiency,LINEAR,5)",,,,,,,,,Deal Efficiency+5 damage to a target enemy,3.0,
 Second Wind,Heavy,Cantrip,,1,,,,,,,,,,,"HealSelf(Sensitivity,LINEAR,0)",,,,,,,,,,Restore HP to your Accessor of a number of points equal to their Sensitivity,,
 Reckless Push,Heavy,Cantrip,,1,,,,,,,,,,,ifUsedBonusRegain(),,,,,,,,,UsedAction:Tactical,"If you already used your Tactical Action, gain one more.",,
-Battlemaster,Heavy,Instant,,2,,,,,,,,,,,,"TempStat(Power,2)||TempStat(Tenacity,5)",+2 Power||+5 Tenacity,,,,,,,,"Choose one effect. It is active until the end of the turn you activated this skill:
+Battlemaster,Heavy,Instant,,1,,,,,,,,,,,,"TempStat(Power,2)||TempStat(Tenacity,5)",+2 Power||+5 Tenacity,,,,,,,,"Choose one effect. It is active until the end of the turn you activated this skill:
 1. Power +2
 2. Tenacity +5",3.0,
 Reload,Heavy,Cantrip,,1,,,,,,,,,,,DrawThenDiscard(1),,,,,,,,,,"Draw a card, then discard a card in your hand.",,
@@ -118,4 +118,4 @@ Rage,,Counter,,,,,,,,,,,,,,,,,,,,,,,"While in play, Power +1. If you miss: Lose 
 Momentum,,Counter,,,,,,,,,,,,,,,,,,,,,,,"During your Duel phase, you can remove this from game to make a learnt Skill ready.",,
 Kai,,Counter,,,,,,,,,,,,,,,,,,,,,,,The next damage Skill deals damage equal to Power instead of their regular value. You cannot have an Off-Hand Equip on field to use this.,,
 Nullified,,Counter,,,,,,,,,,,,,,,,,,,,,,,"The first time you use an Action, it has no effect. (This counter is removed after the first action attempt).",,
-Set: Valor,,,,,,,,,,,,,,,,,,,,,,,,,"While this set is active, you gain Power +2 and Tenacity +2.",,
+Set: Valor,,Counter,,,,,,,,,,,,,,,,,,,,,,,"While this set is active, you gain Power +2 and Tenacity +2.",,

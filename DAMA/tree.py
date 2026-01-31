@@ -8,9 +8,9 @@ from core.card import CantripCard, WeaponCard, EquipCard, Card
 from core.enums import Winner, Actions
 from core.game import Game
 from core.game_logs import GameLogger
-from mcts.heuristics import HeuristicAnalyzer
-from mcts.meta_registry import MetaRegistry
-from mcts.moves_discoverer import get_moves
+from DAMA.heuristics import HeuristicAnalyzer
+from DAMA.meta_registry import MetaRegistry
+from DAMA.moves_discoverer import get_moves
 
 MoveData: TypeAlias = tuple[Card | EquipCard | WeaponCard | CantripCard | None, dict[str, Any]]
 

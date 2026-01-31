@@ -1,6 +1,6 @@
 from typing import Any
 
-from mcts.tree import Node
+from DAMA.tree import Node
 
 
 def extract_from_path(path: list[Node]) -> dict[Any, Any] | None:

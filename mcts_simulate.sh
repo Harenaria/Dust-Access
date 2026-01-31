@@ -5,4 +5,4 @@ cd "$PROJECT_ROOT" || exit
 
 export PYTHONPATH="$PROJECT_ROOT"
 
-poetry run python  mcts/simulator.py "$@"
+poetry run python  DAMA/simulator.py "$@"

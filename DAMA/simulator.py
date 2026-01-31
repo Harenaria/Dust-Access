@@ -12,8 +12,8 @@ from tqdm import tqdm
 from core.deck import get_deck_base_specializations
 from core.enums import Winner, Actions
 from core.game import matchCreator, Game
-from mcts.meta_registry import MetaRegistry
-from mcts.tree import MCTSTree
+from DAMA.meta_registry import MetaRegistry
+from DAMA.tree import MCTSTree
 
 _SPECS_CACHE = {}
 
@@ -269,7 +269,7 @@ def main():
         # 3. Save specific file
         filename = f"meta_stats_{tier_name.lower()}.json"
         tier_registry.save(filename)
-        print(f"✅ Saved data to: {filename}")
+        print(f"Saved data to: {filename}")
 
 
 if __name__ == "__main__":

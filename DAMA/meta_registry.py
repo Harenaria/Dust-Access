@@ -148,7 +148,7 @@ class MetaRegistry:
                 card_obj.get('type') or card_obj.get('cardType') if isinstance(card_obj, dict) else None)
             if obj_type: target['type'] = str(obj_type).upper().replace('_', '-')
 
-            card_class = getattr(card_obj, 'Class', None) or getattr(card_obj, 'accessorClass', None)
+            card_class = getattr(card_obj, 'Class', None) or getattr(card_obj, 'accessorClass', None) or (card_obj, 'acClass', None)
             if card_class: target['class'] = str(card_class)
 
         self.total_simulations += 0.5
