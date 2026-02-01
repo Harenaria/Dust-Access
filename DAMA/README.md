@@ -51,11 +51,11 @@ To improve the fidelity of the simulation phase, DAMA replaces uniform random pl
 
 Evaluation is conducted across three discrete search tiers to isolate specific classes of game-theoretic phenomena:
 
-| Tier | Iterations | Research Objective |
-| :--- | :--- | :--- |
-| **Heuristic/Casual** | 100 | **Early Convergence.** Detection of "Greedy-Dominant" strategies and punisher mechanics. |
-| **Intermediate/Tactical** | 500 | **Multi-Turn Planning.** Evaluation of standard efficiency and resource management. |
-| **Asymptotic/Competitive** | 1000 | **Equilibrium Analysis.** Identification of structural flaws and high-ceiling strategic spikes. |
+| Tier                       | Iterations | Research Objective                                                                              |
+|:---------------------------|:-----------|:------------------------------------------------------------------------------------------------|
+| **Heuristic/Casual**       | 100        | **Early Convergence.** Detection of "Greedy-Dominant" strategies and punisher mechanics.        |
+| **Intermediate/Tactical**  | 500        | **Multi-Turn Planning.** Evaluation of standard efficiency and resource management.             |
+| **Asymptotic/Competitive** | 1000       | **Equilibrium Analysis.** Identification of structural flaws and high-ceiling strategic spikes. |
 
 ---
 
