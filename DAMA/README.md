@@ -19,12 +19,19 @@ The core decision-making engine of DAMA is based on the **Monte Carlo Tree Searc
 3.  **Simulation (Monotonic Rollout)**: Executing a rapid playout from the newly expanded state to a terminal condition (win/loss/draw), providing a noisy estimate of the node's theoretical value.
 4.  **Backpropagation**: Propagating the final outcome upstream through the traversed path, updating the statistical distribution (visit count $n$ and cumulative reward $w$) for all ancestor nodes.
 
-#### Selection Policy: The UCT Algorithm
-DAMA utilizes the **Upper Confidence Bound applied to Trees (UCT)** as its primary selection mechanism, ensuring asymptotic convergence to the minimax optimum:
+#### Selection Policy: UCT with RAVE Blending
+DAMA utilizes the **Upper Confidence Bound applied to Trees (UCT)** combined with **Rapid Action Value Estimation (RAVE)** as its selection mechanism:
 
-$$UCT = \bar{X}_j + C_p \sqrt{\frac{2 \ln n}{n_j}}$$
+$$UCT_{RAVE} = (1-\beta)\bar{X}_j + \beta \cdot AMAF_j + C_p \sqrt{\frac{2 \ln n}{n_j}}$$
 
-where $\bar{X}_j$ represents the empirical mean reward of node $j$, $n$ is the total visit count of the parent, and $C_p$ is the exploration coefficient, calibrated to account for the specific variance of the *Dust Access* reward distribution.
+where:
+*   $\bar{X}_j$ is the empirical mean reward of node $j$
+*   $AMAF_j$ is the All-Moves-As-First heuristic value (see RAVE section)
+*   $\beta$ is the dynamic blending factor that decays as visit counts increase
+*   $n$ is the parent's visit count, $n_j$ is the node's visit count
+*   $C_p = 0.7$ is the exploration coefficient
+
+The exploration coefficient is tuned below the theoretical $\sqrt{2}$ following established practice for heuristic-augmented MCTS (Browne et al., 2012). Studies on card games with imperfect information suggest lower $C_p$ values when strong priors are available (Gelly & Silver, 2011). We use $C_p = 0.7$ as a balance: lower than $\sqrt{2}$ due to RAVE and `HeuristicAnalyzer` priors, but higher than values used in simpler card games (e.g., Hearts) to account for ECG strategic depth.
 
 ---
 

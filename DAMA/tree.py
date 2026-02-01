@@ -69,7 +69,7 @@ class Node:
         if beta_denom == 0: beta = 1
         else: beta = self.amaf_visits / beta_denom
         combined_wr = (1-beta)*self.standard_wr + beta*self.amaf_wr
-        exploration_term = (MCTSConfig.EXPLORATION_CONSTANT * math.log(self.parent.visits)/self.visits)**0.5 if self.parent.visits and self.visits else 0
+        exploration_term = MCTSConfig.UCT_EXPLORATION_CP * math.sqrt(2 * math.log(self.parent.visits) / self.visits) if self.parent.visits and self.visits else 0
         score = combined_wr + exploration_term
         return score
 
