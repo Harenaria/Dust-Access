@@ -12,7 +12,12 @@ class LogEntry(DataclassJSONCapable):
     player: int
     phase: Phases
     message: str
-    timestamp: str = field(default_factory=lambda: datetime.now().strftime("%H:%M:%S"))
+    timestamp: str = ""
+
+    def __post_init__(self):
+        if not self.timestamp:
+            from datetime import datetime
+            self.timestamp = datetime.now().strftime("%H:%M:%S")
 
     @classmethod
     def dict_deserializer(cls, data: Dict[str, Any]):

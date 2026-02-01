@@ -1,5 +1,5 @@
-import math
 import json
+import math
 import os
 from collections import defaultdict
 
@@ -15,21 +15,12 @@ def _default_deck_stats():
 
 
 class MetaRegistry:
-    _instance = None
-
     def __init__(self):
         self.card_stats = defaultdict(_default_card_stats)
         self.deck_stats = defaultdict(_default_deck_stats)
         self.matchup_stats = defaultdict(_default_deck_stats)
         self.total_simulations = 0
         self.deck_cache = {}
-        self.owner_pid = os.getpid()
-
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None or cls._instance.owner_pid != os.getpid():
-            cls._instance = cls()
-        return cls._instance
 
     def clear(self):
         self.card_stats.clear()
@@ -38,28 +29,8 @@ class MetaRegistry:
         self.total_simulations = 0
         self.deck_cache.clear()
 
-    def merge(self, other_registry):
-        self.total_simulations += other_registry.total_simulations
-
-        for card, stats in other_registry.card_stats.items():
-            target = self.card_stats[card]
-            target['wins'] += stats['wins']
-            target['plays'] += stats['plays']
-            target['turn_sum'] += stats['turn_sum']
-            if stats['level'] > 0: target['level'] = stats['level']
-            if stats.get('type') and stats.get('type') != "Unknown": target['type'] = stats['type']
-            if stats.get('class') and stats.get('class') != "Medium": target['class'] = stats['class']
-
-        for deck_id, stats in other_registry.deck_stats.items():
-            target = self.deck_stats[deck_id]
-            target['wins'] += stats.get('wins', 0)
-            target['plays'] += stats.get('plays', 0)
-            target['swinginess'] += stats.get('swinginess', 0.0)
-            target['interactivity'] += stats.get('interactivity', 0)
-            target['comebacks'] += stats.get('comebacks', 0)
-            target['total_turns'] += stats.get('total_turns', 0)
-
-        for key, stats in other_registry.matchup_stats.items():
+    def _merge_deck_info(self, reg_stats:dict):
+        for key, stats in reg_stats.items():
             target = self.matchup_stats[key]
             target['wins'] += stats.get('wins', 0)
             target['plays'] += stats.get('plays', 0)
@@ -88,44 +59,20 @@ class MetaRegistry:
             if stats.get('type') and stats.get('type') != "Unknown": target['type'] = stats['type']
             if stats.get('class') and stats.get('class') != "Medium": target['class'] = stats['class']
 
-        for deck_id, stats in data.get('deck_stats', {}).items():
-            target = self.deck_stats[int(deck_id)]
-            target['wins'] += stats.get('wins', 0)
-            target['plays'] += stats.get('plays', 0)
-            target['swinginess'] += stats.get('swinginess', 0.0)
-            target['interactivity'] += stats.get('interactivity', 0)
-            target['comebacks'] += stats.get('comebacks', 0)
-            target['total_turns'] += stats.get('total_turns', 0)
+        self._merge_deck_info(data.get('deck_stats', {}))
 
-        for key, stats in data.get('matchup_stats', {}).items():
-            target = self.matchup_stats[key]
-            target['wins'] += stats.get('wins', 0)
-            target['plays'] += stats.get('plays', 0)
-            target['swinginess'] += stats.get('swinginess', 0.0)
-            target['interactivity'] += stats.get('interactivity', 0)
-            target['comebacks'] += stats.get('comebacks', 0)
-            target['total_turns'] += stats.get('total_turns', 0)
+        self._merge_deck_info(data.get('matchup_stats', {}))
 
     def update_stats(self, deck_id: int, played_cards: list, winner: bool, opponent_deck_id: int = None,
                      metrics: dict = None):
         val = 1 if winner else 0
         m = metrics or {}
 
-        self.deck_stats[deck_id]['plays'] += 1
-        self.deck_stats[deck_id]['wins'] += val
-        self.deck_stats[deck_id]['swinginess'] += m.get('swinginess', 0.0)
-        self.deck_stats[deck_id]['interactivity'] += m.get('interactivity', 0)
-        self.deck_stats[deck_id]['comebacks'] += 1 if m.get('comeback_win') else 0
-        self.deck_stats[deck_id]['total_turns'] += m.get('turns', 0)
+        self._update_helper(self.deck_stats, deck_id, m, val)
 
         if opponent_deck_id is not None:
             key = f"{deck_id}_vs_{opponent_deck_id}"
-            self.matchup_stats[key]['plays'] += 1
-            self.matchup_stats[key]['wins'] += val
-            self.matchup_stats[key]['swinginess'] += m.get('swinginess', 0.0)
-            self.matchup_stats[key]['interactivity'] += m.get('interactivity', 0)
-            self.matchup_stats[key]['comebacks'] += 1 if m.get('comeback_win') else 0
-            self.matchup_stats[key]['total_turns'] += m.get('turns', 0)
+            self._update_helper(self.matchup_stats, key, m, val)
 
         unique_cards = {}
         for item in played_cards:
@@ -152,6 +99,15 @@ class MetaRegistry:
             if card_class: target['class'] = str(card_class)
 
         self.total_simulations += 0.5
+
+    @staticmethod
+    def _update_helper(stat_list, key, metrics: dict, winner: int):
+        stat_list[key]['plays'] += 1
+        stat_list[key]['wins'] += winner
+        stat_list[key]['swinginess'] += metrics.get('swinginess', 0.0)
+        stat_list[key]['interactivity'] += metrics.get('interactivity', 0)
+        stat_list[key]['comebacks'] += 1 if metrics.get('comeback_win') else 0
+        stat_list[key]['total_turns'] += metrics.get('turns', 0)
 
     def get_meta_weight_modifier(self, card_name: str) -> tuple[float, float]:
         if card_name not in self.card_stats: return 0.0, 500.0

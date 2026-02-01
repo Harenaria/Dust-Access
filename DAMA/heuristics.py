@@ -1,17 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 from core.game import Game
-from core.enums import Winner, Counter, AccessorClass, CardType
-
-
-class CardTag(Enum):
-    GENERATOR = auto()  # Rage, Kai, Draw
-    CONSUMER = auto()   # Scales with Rage/Kai
-    FINISHER = auto()    # Level 5+ or high damage
-    DEFENSIVE = auto()   # Heal, Tenacity, Shield
-    COUNTER = auto()     # Nullify, Discard, Unequip
-    SCALER = auto()      # Permanent stat buffs
-    COMBO = auto()       # Chains or Sets
+from core.enums import Winner, Counter, AccessorClass, CardType, CardTag
+from DAMA.constants import HeuristicWeights
 
 
 @dataclass
@@ -23,50 +14,6 @@ class ThreatReport:
 
 
 class HeuristicAnalyzer:
-    _tag_cache = {}
-
-    @staticmethod
-    def _tag_card(card) -> set[CardTag]:
-        """Categorizes a card into functional tags for faster heuristic evaluation."""
-        name = getattr(card, 'name', 'Unknown')
-        if name in HeuristicAnalyzer._tag_cache:
-            return HeuristicAnalyzer._tag_cache[name]
-
-        tags = set()
-        on_play = str(getattr(card, 'OnPlay', ''))
-        on_activate = str(getattr(card, 'OnActivate', ''))
-        effects = on_play + on_activate
-        
-        # Generator
-        if any(x in effects for x in ["Rage", "Kai", "Draw", "Refill"]):
-            tags.add(CardTag.GENERATOR)
-        
-        # Consumer (Heuristic: usually cards with AtkStat or specific scaling mentions)
-        if hasattr(card, 'AtkStat') or "Scale" in effects:
-            tags.add(CardTag.CONSUMER)
-            
-        # Finisher
-        if getattr(card, 'level', 1) >= 5 or "Lethal" in effects:
-            tags.add(CardTag.FINISHER)
-            
-        # Defensive
-        if any(x in effects for x in ["Heal", "Tenacity", "Shield", "Cover"]):
-            tags.add(CardTag.DEFENSIVE)
-            
-        # Counter
-        if any(x in effects for x in ["Nullify", "Discard", "Unequip", "Rust"]):
-            tags.add(CardTag.COUNTER)
-            
-        # Scaler
-        if any(x in effects for x in ["Permanent", "PowerIncrease", "TenacityIncrease"]):
-            tags.add(CardTag.SCALER)
-            
-        # Combo
-        if getattr(card, 'ChainsWith', None) or "Set:" in effects:
-            tags.add(CardTag.COMBO)
-
-        HeuristicAnalyzer._tag_cache[name] = tags
-        return tags
 
     @staticmethod
     def predict_damage(power: int, tenacity: int) -> int:
@@ -80,20 +27,22 @@ class HeuristicAnalyzer:
         me = state.players[my_id]
         opp = state.players[opp_id]
 
-        # Damage prediction
-        weapon_dmg = HeuristicAnalyzer.predict_damage(me.currentPower, me.currentTenacity)
-        
+        # Incoming Damage Prediction (Can I survive?)
+        # Predicted damage: Enemy's Power vs My Tenacity
+        weapon_dmg = HeuristicAnalyzer.predict_damage(opp.currentPower, me.currentTenacity)
+
         report.incoming_damage = weapon_dmg
         if weapon_dmg >= me.currentHP: report.lethal_risk = True
 
-        # Enemy is "walling" me
-        my_dmg = HeuristicAnalyzer.predict_damage(me.currentPower, me.currentTenacity)
-        if my_dmg == 1: report.wall_threat = True
+        # Offensive "Wall" Check (Can I hurt them?)
+        # My Power vs Enemy's Tenacity
+        my_dmg = HeuristicAnalyzer.predict_damage(me.currentPower, opp.currentTenacity)
+        if my_dmg <= 1: report.wall_threat = True
 
         # Enemy has volatile resources that I could disable
         if state.players[opp_id].counters.count(Counter.RAGE) > 0:
             report.volatile_threat = True
-            
+
         return report
 
     @staticmethod
@@ -104,54 +53,54 @@ class HeuristicAnalyzer:
         """
         hand = state.players[player_id].hand
         # Conta le carte con Livello 1 o 2 (giocabili subito o al prossimo turno)
-        low_level_cards = [c for c in hand if getattr(c, 'level', 1) <= 2]
+        low_level_cards = [c for c in hand if getattr(c, 'level', 1) <= HeuristicWeights.LOW_LEVEL_THRESHOLD]
 
         # Se abbiamo 0 o 1 carta giocabile, la mano è un "mattone" (brick).
         # Diamo un bonus altissimo all'azione di Mulligan.
-        if len(low_level_cards) <= 1:
-            return 800.0
+        if len(low_level_cards) <= HeuristicWeights.HAND_BRICK_THRESHOLD:
+            return HeuristicWeights.MULLIGAN_BONUS
 
-            # Se abbiamo già 3 o più carte giocabili, la mano è ottima.
+        # Se abbiamo già 3 o più carte giocabili, la mano è ottima.
         # Diamo un malus pesante all'azione di Mulligan per evitarla.
-        if len(low_level_cards) >= 3:
-            return -800.0
+        if len(low_level_cards) >= HeuristicWeights.HAND_HEALTHY_THRESHOLD:
+            return HeuristicWeights.MULLIGAN_PENALTY
 
         return 0.0
 
     @staticmethod
     def evaluate_state(game: Game, player_id: int) -> float:
         """Represents the chance of winning based on the archetype."""
-        if game.winner == Winner(player_id + 1): return 1.0 # Winner enum is 1-indexed
+        if game.winner == Winner(player_id + 1): return 1.0  # Winner enum is 1-indexed
         if game.winner != Winner.NONE: return -1.0
 
         me = game.players[player_id]
         opp = game.players[1 - player_id]
-        
+
         # Detect Persona
         persona = me.specialization.accessorClass
-        
+
         # Base Metrics
         my_dpt = HeuristicAnalyzer.predict_damage(me.currentPower, opp.currentTenacity)
         opp_dpt = HeuristicAnalyzer.predict_damage(opp.currentPower, me.currentTenacity)
-        
-        my_ttd = me.currentHP / max(0.1, opp_dpt)
-        opp_ttd = opp.currentHP / max(0.1, my_dpt)
-        
+
+        my_ttd = me.currentHP / max(HeuristicWeights.EPSILON, opp_dpt)
+        opp_ttd = opp.currentHP / max(HeuristicWeights.EPSILON, my_dpt)
+
         hp_diff_ratio = (me.currentHP - opp.currentHP) / max(1, me.currentDurability)
-        
+
         # Archetype Specific Weights
         score = 0.0
-        
-        if persona == AccessorClass.HEAVY: 
+
+        if persona == AccessorClass.HEAVY:
             # AGGRO: Kill fast. High value on lowering Enemy HP/TTD.
             if my_ttd > opp_ttd:
                 score = 1.0 - (opp_ttd / (my_ttd + 0.1))
             else:
                 score = -1.0 + (my_ttd / (opp_ttd + 0.1))
-            
+
             # Bonus for Rage maintenance
-            if Counter.RAGE in me.counters: score += 0.1
-            
+            if Counter.RAGE in me.counters: score += HeuristicWeights.HEAVY_RAGE_BONUS
+
         elif persona == AccessorClass.MEDIUM:
             # MIDRANGE: Balance.
             race_score = 0
@@ -159,25 +108,25 @@ class HeuristicAnalyzer:
                 race_score = 0.5
             else:
                 race_score = -0.5
-                
+
             # Value board/resources more
-            resource_score = (len(me.hand) - len(opp.hand)) * 0.05
-            score = race_score + resource_score + (hp_diff_ratio * 0.5)
+            resource_score = (len(me.hand) - len(opp.hand)) * HeuristicWeights.MEDIUM_RESOURCE_SCALAR
+            score = race_score + resource_score + (hp_diff_ratio * HeuristicWeights.MEDIUM_HP_DIFF_SCALAR)
 
         elif persona == AccessorClass.LIGHT:
             # CONTROL: Survive early, crush late.
-            is_late_game = me.level >= 7
-            
+            is_late_game = me.level >= HeuristicWeights.LIGHT_LATE_GAME_LEVEL
+
             if is_late_game:
                 # GAP CLOSING MODE
-                 if my_ttd > opp_ttd:
-                    score = 1.0 - (opp_ttd / (my_ttd + 0.1))
-                 else:
-                    score = -1.0 + (my_ttd / (opp_ttd + 0.1))
+                if my_ttd > opp_ttd:
+                    score = 1.0 - (opp_ttd / (my_ttd + HeuristicWeights.EPSILON))
+                else:
+                    score = -1.0 + (my_ttd / (opp_ttd + HeuristicWeights.EPSILON))
             else:
                 # SURVIVAL MODE
                 survival_score = me.currentHP / me.currentDurability
-                card_adv = (len(me.hand) - len(opp.hand)) * 0.1
+                card_adv = (len(me.hand) - len(opp.hand)) * HeuristicWeights.LIGHT_CARD_ADV_SCALAR
                 score = survival_score + card_adv
 
         return max(-1.0, min(1.0, score))
@@ -188,170 +137,93 @@ class HeuristicAnalyzer:
         bonus = 0.0
         me = state.players[player_id]
         opp = state.players[1 - player_id]
-        persona = me.specialization.accessorClass
-        tags = HeuristicAnalyzer._tag_card(card)
-        card_name = getattr(card, 'name', '')
-        
-        # --- 1. COMBO & CHAINS (Human-like sequencing) ---
-        if me.chainedSkillName == card_name:
-            bonus += 600.0 # Peak priority: finish the chain
+        if not card: return 0.0
 
+        persona = me.specialization.accessorClass
+        tags = card.tags
+        card_name = getattr(card, 'name', '')
+
+        # --- COMBO & CHAINS (Sequencing) ---
+        if me.chainedSkillName == card_name:
+            bonus += HeuristicWeights.CHAIN_COMPLETION_BONUS  # Peak priority: finish the chain
+
+        # If card has a Chain successor, bonus for having the chance to chain it
         if CardTag.COMBO in tags:
             chains_with = getattr(card, 'ChainsWith', None)
             if chains_with and any(c.name == chains_with for c in (me.hand + [s for s in me.skillSlots if s])):
-                bonus += 120.0
-            # Set Piece Logic
-            if "Set:" in str(getattr(card, 'OnPlay', '')):
-                 valors_equipped = sum(1 for c in me.equippedCards.values() if c and "Valor" in c.name)
-                 if valors_equipped == 1 and "Valor" in card_name:
-                     bonus += 100.0
+                bonus += HeuristicWeights.CHAIN_POTENTIAL_BONUS
 
-        # --- 2. RAMPING & SNOWBALLING (Early Game focus) ---
-        is_early_game = state.turn <= 5
+            # Set Piece Logic: Check if the card calls checkEquipSet
+            if "checkEquipSet" in getattr(card, 'called_methods', set()):
+                valors_equipped = sum(1 for c in me.equippedCards.values() if c and "Valor" in c.name)
+                if valors_equipped == 1 and "Valor" in card_name:
+                    bonus += HeuristicWeights.SET_PIECE_BONUS
+
+        # --- RAMPING & SNOWBALLING ---
+        # Early Game: Ramp up, Late Game: Diminish returns
+        # (It's supposed that in Late you already have enough resources and have to focus on using them)
+        is_early_game = state.turn <= HeuristicWeights.EARLY_GAME_TURN_LIMIT
         if is_early_game:
             if CardTag.GENERATOR in tags:
-                 # Ramping: Get resources early (especially Heavy/Medium)
-                 bonus += 80.0
+                # Ramping: Get resources early (especially Heavy/Medium)
+                bonus += HeuristicWeights.EARLY_RAMP_BONUS
             if CardTag.SCALER in tags:
-                 # Snowballing: Permanent buffs are better early
-                 # Light (Scaling) players prioritize these even more
-                 if persona == AccessorClass.LIGHT:
-                     bonus += 120.0 
-                 else:
-                     bonus += 60.0
+                # Snowballing: Permanent buffs are better early
+                # Light (Scaling) players prioritize these even more
+                if persona == AccessorClass.LIGHT:
+                    bonus += HeuristicWeights.EARLY_SCALING_BONUS_LIGHT
+                else:
+                    bonus += HeuristicWeights.EARLY_SCALING_BONUS_GENERIC
         else:
-            if CardTag.GENERATOR in tags and len(me.hand) > 4:
-                 # Diminishing returns on draw generators late game
-                 bonus -= 20.0
+            if CardTag.GENERATOR in tags and len(me.hand) > HeuristicWeights.LATE_GAME_HAND_SIZE:
+                # Diminishing returns on draw generators late game
+                bonus += HeuristicWeights.LATE_GAME_GENERATOR_PENALTY
 
-        # --- 3. TEMPO (Immediate Impact) ---
+        # --- TEMPO (Immediate Impact) ---
         # Tempo is most critical when HP is low or for Aggro personas
-        is_lethal_range = opp.currentHP / opp.currentDurability < 0.4
-        
+        is_lethal_range = opp.currentHP / max(1, opp.currentDurability) < HeuristicWeights.LETHAL_HP_RATIO
+
         tempo_val = 0.0
         if CardTag.FINISHER in tags:
             # Finisher Discipline: Optimizing for impact
             if is_lethal_range:
-                tempo_val += 150.0
+                tempo_val += HeuristicWeights.FINISHER_LETHAL_BONUS
             else:
-                tempo_val -= 40.0 # Don't waste early
-        
-        if CardTag.DEFENSIVE in tags and (me.currentHP / me.currentDurability < 0.3):
-             tempo_val += 120.0 # Survival tempo
+                tempo_val += HeuristicWeights.FINISHER_EARLY_PENALTY  # Constant is negative
+
+        if CardTag.DEFENSIVE in tags and (
+                me.currentHP / max(1, me.currentDurability) < HeuristicWeights.SURVIVAL_HP_RATIO):
+            tempo_val += HeuristicWeights.SURVIVAL_TEMPO_BONUS  # Survival tempo
 
         # Persona Scaling for Tempo
         if persona == AccessorClass.HEAVY:
-            bonus += tempo_val * 1.5 # Aggro values tempo 1.5x more
+            bonus += tempo_val * HeuristicWeights.AGGRO_TEMPO_MULTIPLIER  # Aggro values tempo more
         else:
             bonus += tempo_val
 
-        # --- 4. META-COUNTERING ---
+        # --- META-COUNTERING ---
         if CardTag.COUNTER in tags and weights_cache:
             for equip in opp.equippedCards.values():
                 if equip:
-                    # Use cache passed from MCTS tree to avoid millions of singleton/lock calls
+                    # Use cache passed from the MCTS tree to avoid millions of singleton/lock calls
                     if equip.name in weights_cache:
                         bias, _ = weights_cache[equip.name]
-                        if bias > 20.0: # Opponent has a meta-powerhouse
-                            bonus += 150.0
+                        if bias > HeuristicWeights.META_COUNTER_THRESHOLD:  # Opponent has a meta-powerhouse
+                            bonus += HeuristicWeights.META_COUNTER_BONUS
                             break
 
-        # --- 5. RESOURCE EFFICIENCY ---
+        # --- RESOURCE EFFICIENCY ---
         # Generator sequencing
-        has_low_rage = me.counters.count(Counter.RAGE) < 2
+        has_low_rage = me.counters.count(Counter.RAGE) < HeuristicWeights.LOW_RAGE_THRESHOLD
         if has_low_rage and CardTag.GENERATOR in tags:
-            bonus += 40.0
+            bonus += HeuristicWeights.LOW_RAGE_GENERATOR_BONUS
         if not has_low_rage and CardTag.CONSUMER in tags:
-            bonus += 30.0
+            bonus += HeuristicWeights.HIGH_RAGE_CONSUMER_BONUS
 
-        # --- 6. PREREQUISITE CHECK (Declarative from Requires field) ---
-        prereq_mult = HeuristicAnalyzer.check_prerequisites(card, state, player_id)
-        if prereq_mult < 0.1:
-            return -500.0  # Hard penalty: don't use this card without prerequisites
+        # --- PREREQUISITE CHECK ---
+        prereq_mult = state.check_requirements(player_id, card)
+        if prereq_mult < HeuristicWeights.PREREQ_MIN_THRESHOLD:
+            return HeuristicWeights.PREREQ_FAIL_PENALTY  # Hard penalty: don't use this card without prerequisites
         bonus *= prereq_mult  # Scale all bonuses by prerequisite satisfaction
 
         return bonus
-
-    @staticmethod
-    def check_prerequisites(card, state: Game, player_id: int) -> float:
-        """
-        Returns a multiplier (0.0 to 1.0) based on prerequisite satisfaction.
-        0.0 = prerequisites NOT met, do not use this card
-        1.0 = all prerequisites met
-        0.5 = partial (e.g., missing 1 of 2 required counters)
-        """
-        requires = getattr(card, 'Requires', '') or ''
-        me = state.players[player_id]
-        
-        # Auto-detect chain setup requirement from ChainsWith
-        chains_with = getattr(card, 'ChainsWith', '')
-        if chains_with:
-            target_available = any(
-                c.name == chains_with 
-                for c in (me.hand + [s for s in me.skillSlots if s])
-            )
-            if not target_available:
-                # Chain target not available - reduced value but not zero
-                # (Card still has base value without the chain)
-                if not requires:
-                    return 0.4  # Partial value without chain target
-        
-        if not requires:
-            return 1.0  # No explicit requirements
-        
-        clauses = [r.strip() for r in requires.split('&&')]
-        
-        for clause in clauses:
-            if clause == '2H':
-                weapon = me.equippedCards.get(CardType.WEAPON)
-                if not (weapon and getattr(weapon, 'is2Handed', False)):
-                    return 0.0  # Hard fail - 2H weapon required
-            
-            elif clause.startswith('Counter:'):
-                # Format: Counter:RAGE:2
-                parts = clause.split(':')
-                try:
-                    counter_name = parts[1].upper()
-                    counter_type = Counter[counter_name]
-                    required_count = int(parts[2]) if len(parts) > 2 else 1
-                    actual_count = me.counters.count(counter_type)
-                    if actual_count < required_count:
-                        return actual_count / required_count  # Partial satisfaction
-                except (KeyError, ValueError, IndexError):
-                    pass  # Invalid counter spec, ignore
-            
-            elif clause.startswith('Equip:'):
-                # Format: Equip:OFF_HAND or Equip:WEAPON
-                slot_name = clause.split(':')[1].upper()
-                try:
-                    slot = CardType[slot_name]
-                    if me.equippedCards.get(slot) is None:
-                        return 0.0  # Required equipment not present
-                except (KeyError, ValueError, IndexError):
-                    pass  # Invalid slot name, ignore
-            
-            elif clause.startswith('UsedAction:'):
-                # Format: UsedAction:Tactical or UsedAction:Combat or UsedAction:Tactical&&Combat
-                action_type = clause.split(':')[1]
-                if 'Tactical' in action_type and me.hasTacticalAction:
-                    return 0.0  # Card only useful if tactical already used
-                if 'Combat' in action_type and me.hasCombatAction:
-                    return 0.0  # Card only useful if combat already used
-            
-            elif clause.startswith('HP:'):
-                # Format: HP:>50% or HP:<30%
-                condition = clause[3:]
-                hp_percent = (me.currentHP / me.currentDurability) * 100 if me.currentDurability > 0 else 0
-                try:
-                    if condition.startswith('>'):
-                        threshold = float(condition[1:].rstrip('%'))
-                        if hp_percent <= threshold:
-                            return 0.0
-                    elif condition.startswith('<'):
-                        threshold = float(condition[1:].rstrip('%'))
-                        if hp_percent >= threshold:
-                            return 0.0
-                except ValueError:
-                    pass  # Invalid HP spec, ignore
-        
-        return 1.0

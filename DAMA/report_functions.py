@@ -7,7 +7,7 @@ from IPython.display import display
 
 
 # --------------------------------------------------------
-# 1. Data Ingestion
+# Data Ingestion
 # --------------------------------------------------------
 
 def load_tiered_data(data_dir='../data', decks_meta_path='../data/decks_metadata/en_US.json'):
@@ -51,7 +51,7 @@ def load_tiered_data(data_dir='../data', decks_meta_path='../data/decks_metadata
 
 
 # --------------------------------------------------------
-# 2. Logic Helpers (Calculations)
+# Logic Helpers (Calculations)
 # --------------------------------------------------------
 
 def get_expected_winrate(c_class, level):
@@ -130,7 +130,7 @@ def calculate_fun_scores(data_fragment):
 
 
 # --------------------------------------------------------
-# 3. Visualization Functions (Tier-Aware)
+# Visualization Functions (Tier-Aware)
 # --------------------------------------------------------
 
 def plot_skill_scalability(report_data):
@@ -296,7 +296,7 @@ def plot_matchup_duration(report_data, target_tier='Competitive'):
 
 
 # --------------------------------------------------------
-# 4. Tables and AI
+# Tables and AI
 # --------------------------------------------------------
 
 def display_top_cards(report_data, target_tier='Competitive', limit=10):
@@ -330,7 +330,7 @@ def display_searchable_table(report_data):
         print("No tier data available.")
         return
 
-    # 1. Build a Base DataFrame with Metadata (Name, Level, Type)
+    # Build a Base DataFrame with Metadata (Name, Level, Type)
     # We combine all cards found in any tier
     all_cards = {}
 
@@ -356,7 +356,7 @@ def display_searchable_table(report_data):
     # Fill NaNs (cards not played in certain tiers)
     df = df.fillna(0)
 
-    # 2. Format Columns for Display
+    # Format Columns for Display
     # We create a list of columns to show.
     # Logic: Metadata -> Casual Stats -> Advanced Stats -> Competitive Stats
 
@@ -402,7 +402,7 @@ def display_searchable_table(report_data):
         cell_values.append(formatted_stats)
         fill_color.append(colors)
 
-    # 3. Render Plotly Table
+    # Render Plotly Table
     fig = go.Figure(data=[go.Table(
         columnorder=list(range(len(headers))),
         columnwidth=[120, 40, 60] + [80] * len(available_tiers),  # Metadata wider
@@ -440,7 +440,7 @@ def get_ai_summary(report_data, api_key):
     if not api_key or "API_KEY" in api_key:
         return "Error: Invalid API Key."
 
-    # --- 1. CONSTRUCT THE MASTER DATASET ---
+    # --- CONSTRUCT THE MASTER DATASET ---
     # We need a dataframe that has [Name, Casual_Eff, Comp_Eff, Plays]
 
     tiers = report_data['tiers']
@@ -507,7 +507,7 @@ def get_ai_summary(report_data, api_key):
         with open(path, 'r') as f:
             rules = f.read()
 
-    # --- 2. THE PROMPT ENGINEERING ---
+    # --- PROMPT ---
 
     data_block = "\n".join(sorted(card_report_lines))
 
@@ -546,7 +546,7 @@ def get_ai_summary(report_data, api_key):
     Make your tone professional, insightful, and decisive.
     """
 
-    # --- 3. EXECUTION ---
+    # --- EXECUTION ---
     try:
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(

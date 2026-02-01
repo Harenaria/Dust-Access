@@ -36,11 +36,10 @@ def get_moves(pid: int, g: Game) -> list[tuple[Card | EquipCard | WeaponCard | C
         moves.append((None, {'action': Actions.DRAW, 'args': {}}))
 
     # --- PRIORITY 3: Hand Actions ---
-    # Iterate the hand exactly ONCE for efficiency
 
     for i, card in enumerate(p.hand):
 
-        # 1. LEARN (Preparation Phase)
+        # LEARN (Preparation Phase)
         if Actions.LEARN in action_list:
             is_valid_learn = False
             if g.phase == Phases.PREPARATION:
@@ -54,7 +53,7 @@ def get_moves(pid: int, g: Game) -> list[tuple[Card | EquipCard | WeaponCard | C
             if is_valid_learn:
                 moves.append((card, {'action': Actions.LEARN, 'args': {'index': i, 'card_name': card.name}}))
 
-        # 2. CAST (Duel Phase - Cantrips)
+        # CAST (Duel Phase - Cantrips)
         if Actions.CAST in action_list and card.cardType == CardType.CANTRIP:
             if g.phase == Phases.DUEL:
                 if card.level <= p.level:
@@ -73,61 +72,44 @@ def get_moves(pid: int, g: Game) -> list[tuple[Card | EquipCard | WeaponCard | C
                             {'action': Actions.CAST, 'args': {'index': i, 'card_name': card.name}}
                         ))
 
-        # 3. EQUIP (Duel Phase)
-        if Actions.EQUIP in action_list and p.hasTacticalAction:
-            if g.phase == Phases.DUEL:
-                is_equip_type = (card.cardType in
-                                 [CardType.WEAPON, CardType.DUAL, CardType.OFF_HAND,
-                                  CardType.HEAD, CardType.CHEST, CardType.BRACERS, CardType.BOOTS])
-
-                if is_equip_type and p.level >= card.level:
-                    # Validate Dual Wielding Logic
-                    weapon = p.equippedCards.get(CardType.WEAPON)
-                    is_dual_equipped = weapon is not None and weapon.cardType == CardType.DUAL
-
-                    # Cannot equip Off-Hand if holding 2H Weapon
-                    if not (card.cardType == CardType.OFF_HAND and is_dual_equipped):
-                        moves.append((
-                            card,
-                            {'action': Actions.EQUIP,
-                             'args': {'index': i, 'card_name': card.name, 'slot': card.cardType}}
-                        ))
+        # EQUIP (Duel Phase)
+        if Actions.EQUIP in action_list:
+            args = {'index': i, 'card_name': card.name, 'slot': card.cardType}
+            # Pre-filter optimization to avoid building dicts for non-equips (optional but good)
+            # But keeping strictly to "Ask Don't Guess", we just ask.
+            check = g.is_action_valid(g.isPlaying, Actions.EQUIP, args)
+            if check['valid']:
+                moves.append((card, {'action': Actions.EQUIP, 'args': args}))
 
     # --- PRIORITY 4: Board Actions (Skills / Equipment) ---
-
-    if Actions.ACTIVATE in action_list and "Nullified" not in p.statuses:
+    
+    if Actions.ACTIVATE in action_list:
         # Skills
         for i, skill in enumerate(p.skillSlots):
-            if skill and skill.currentCD == 0:
-                is_chained = (p.chainedSkillName == skill.name)
-                can_activate = p.hasTacticalAction or skill.cardType == CardType.INSTANT or is_chained
-                if can_activate:
-                    effect_field = "OnChainActivate" if is_chained and skill.OnChainActivate else "OnActivate"
-                    effects = getattr(skill, effect_field, [])
-                    if skill.ChoiceLabels and len(effects) > 1:
-                        for choice_id in range(len(skill.ChoiceLabels)):
-                            moves.append((
-                                p.skillSlots[i],
-                                {
-                                    'action': Actions.ACTIVATE,
-                                    'args': {'source': 'SKILL', 'index': i, 'choice': choice_id}
-                                }
-                            ))
-                    else:
-                        moves.append((skill, {'action': Actions.ACTIVATE, 'args': {'source': 'SKILL', 'index': i}}))
+            if not skill: continue
+
+            # Check for Multi-Choice
+            if skill.ChoiceLabels:
+                for choice_id in range(len(skill.ChoiceLabels)):
+                    args = {'source': 'SKILL', 'index': i, 'choice': choice_id}
+                    if g.is_action_valid(g.isPlaying, Actions.ACTIVATE, args)['valid']:
+                        moves.append((skill, {'action': Actions.ACTIVATE, 'args': args}))
+            else:
+                args = {'source': 'SKILL', 'index': i}
+                if g.is_action_valid(g.isPlaying, Actions.ACTIVATE, args)['valid']:
+                    moves.append((skill, {'action': Actions.ACTIVATE, 'args': args}))
 
         # Equipment
         for slot, card in p.equippedCards.items():
             if card and card.OnActivate:
-                is_combat_item = card.cardType in [CardType.WEAPON, CardType.DUAL, CardType.OFF_HAND]
-                can_activate = (is_combat_item and p.hasCombatAction) or (not is_combat_item and p.hasTacticalAction)
-                if can_activate:
-                    moves.append((
-                        card,
-                        {
-                            'action': Actions.ACTIVATE,
-                            'args': {'source': 'EQUIP', 'slot': slot}
-                        }
-                    ))
+                if card.ChoiceLabels:
+                    for choice_id in range(len(card.ChoiceLabels)):
+                        args = {'source': 'EQUIP', 'slot': slot, 'choice': choice_id}
+                        if g.is_action_valid(g.isPlaying, Actions.ACTIVATE, args)['valid']:
+                            moves.append((card, {'action': Actions.ACTIVATE, 'args': args}))
+                else:
+                    args = {'source': 'EQUIP', 'slot': slot}
+                    if g.is_action_valid(g.isPlaying, Actions.ACTIVATE, args)['valid']:
+                        moves.append((card, {'action': Actions.ACTIVATE, 'args': args}))
 
     return moves

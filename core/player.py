@@ -35,6 +35,7 @@ class Specialization(DataclassJSONCapable):
     sensitivity: int = 0
     onGameBegins: str = ""
 
+
     @classmethod
     def from_name(cls, name: str):
         """Factory to create a Spec object from the CSV database."""
@@ -126,11 +127,12 @@ class Player(DataclassJSONCapable):
             if isinstance(card_data, dict):
                 self.equippedCards[slot] = Deck.deserialize_card(card_data)
 
-        # Hydrate Skills
         self.skillSlots = [
             Deck.deserialize_card(c) if isinstance(c, dict) else c
             for c in self.skillSlots
         ]
+
+
 
     @classmethod
     def create_new(cls, isFirstPlayer: bool, accessorName: str, deckID: int, specName: str):

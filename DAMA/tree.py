@@ -5,12 +5,13 @@ import random
 from typing import Any, TypeAlias, override
 
 from core.card import CantripCard, WeaponCard, EquipCard, Card
-from core.enums import Winner, Actions
+from core.enums import Winner, Actions, CardTag
 from core.game import Game
 from core.game_logs import GameLogger
 from DAMA.heuristics import HeuristicAnalyzer
 from DAMA.meta_registry import MetaRegistry
 from DAMA.moves_discoverer import get_moves
+from DAMA.constants import MCTSConfig, RolloutPolicyWeights
 
 MoveData: TypeAlias = tuple[Card | EquipCard | WeaponCard | CantripCard | None, dict[str, Any]]
 
@@ -60,23 +61,28 @@ class Node:
         return path
 
     def ucb1_rave(self) -> float:
-        b_param = 0.05 # Makes the AMAF values' impact "decay" over time
+        b_param = MCTSConfig.RAVE_B_PARAM # Makes the AMAF values' impact "decay" over time
         if self.visits == 0: return float('inf')
         self.standard_wr = self.wins / self.visits
-        self.amaf_wr = self.amaf_wins / self.amaf_visits if self.amaf_visits > 0 else 0.5
+        self.amaf_wr = self.amaf_wins / self.amaf_visits if self.amaf_visits > 0 else MCTSConfig.AMAF_DEFAULT_WR
         beta_denom = self.visits + self.amaf_visits + 4*b_param**2*self.visits*self.amaf_visits
         if beta_denom == 0: beta = 1
         else: beta = self.amaf_visits / beta_denom
         combined_wr = (1-beta)*self.standard_wr + beta*self.amaf_wr
-        exploration_term = (2*math.log(self.parent.visits)/self.visits)**0.5 if self.parent.visits and self.visits else 0
+        exploration_term = (MCTSConfig.EXPLORATION_CONSTANT * math.log(self.parent.visits)/self.visits)**0.5 if self.parent.visits and self.visits else 0
         score = combined_wr + exploration_term
         return score
 
 
 
 class MCTSTree:
-    def __init__(self, root_state:Game):
-        self.root: Node = Node(root_state)
+    def __init__(self, root_state:Game, registry: MetaRegistry | None = None):
+        # We start by using a CLONE of the state, so we don't mess up the real game's logs.
+        # Immedately strip the logs to save memory/perf during expansion
+        sim_root = root_state.clone()
+        sim_root.logs = DummyLogger("", [])
+        self.root: Node = Node(sim_root)
+        self.registry = registry if registry else MetaRegistry()
 
     def step_root_to_node(self, node:Node) -> None:
         if node not in self.root.children:
@@ -113,23 +119,24 @@ class MCTSTree:
         if self.root.is_leaf() and self.root.is_fully_expanded(): return None
         
         # Performance Cache for the duration of this decisor call
-        registry = MetaRegistry.get_instance()
         weights_cache = {}
         for move in self.root.moves_to_try:
             name = getattr(move[0], 'name', None)
             if name and name not in weights_cache:
-                weights_cache[name] = registry.get_meta_weight_modifier(name)
+                weights_cache[name] = self.registry.get_meta_weight_modifier(name)
 
         for i in range(iterations):
-            #determinization on root to create different possibilities
+            # determinization on root to create different possibilities
             working_state = self.root.state.clone()
+            working_state.simulation_mode = True
+            working_state.logs = DummyLogger("", [])
             observer_id = working_state.isPlaying
             self._determinize_state(working_state, observer_id)
 
             # Selection
             selected_node, working_state = self._selection(self.root, working_state)
             # Expansion
-            if not working_state.winner != Winner.NONE:
+            if working_state.winner == Winner.NONE:
                 expanded_node, working_state = self._expansion(selected_node, working_state)
             else:
                 expanded_node = selected_node
@@ -156,7 +163,6 @@ class MCTSTree:
             if not n.is_fully_expanded(): break
 
             n = max(n.children, key=lambda c: c.ucb1_rave())
-            MCTSTree._ensure_move_consistency(n, working_state)
             res = working_state.receiveAction(working_state.isPlaying, n.move['action'], n.move['args'])
             if not res['valid']:
                 # We expect this to happen occasionally due to shuffling.
@@ -179,10 +185,7 @@ class MCTSTree:
                 move_data=move_data
             )
 
-            # Try to fix the state to make this move valid
-            MCTSTree._ensure_move_consistency(new_node, working_state)
-
-            # Check if the move is valid in the fixed state
+            # Check if the move is valid in the determinized state
             res = working_state.receiveAction(working_state.isPlaying, move_data[1]['action'], move_data[1]['args'])
 
             if res['valid']:
@@ -197,99 +200,72 @@ class MCTSTree:
         # We return the selected node itself to force a rollout from here
         return selected_node, working_state
 
-    @staticmethod
-    def _ensure_move_consistency(node: Node, state: Game) -> None:
-        required_card = node.card_used
-        if not required_card: return
-
-        player = state.players[state.isPlaying]
-        action = node.move['action']
-
-        # CASE 1: REWARDS
-        if action == Actions.CHOOSE_REWARD:
-            if any(c.name == required_card.name for c in player.choice_candidates): return
-
-            # Find in Deck
-            deck_index = -1
-            for i, c in enumerate(player.deck.cards):
-                if c.name == required_card.name:
-                    deck_index = i
-                    break
-
-            if deck_index != -1:
-                player.choice_candidates.append(player.deck.cards.pop(deck_index))
-            return
-
-        # CASE 2: HAND ACTIONS
-        if any(c.name == required_card.name for c in player.hand): return
-
-        # Find in Deck
-        deck_index = -1
-        for i, c in enumerate(player.deck.cards):
-            if c.name == required_card.name:
-                deck_index = i
-                break
-
-        if deck_index != -1:
-            card_from_deck = player.deck.cards.pop(deck_index)
-            # Swap with last card in hand if hand is not empty
-            if player.hand:
-                card_from_hand = player.hand.pop()
-                player.deck.cards.append(card_from_hand)
-            player.hand.append(card_from_deck)
 
     @staticmethod
     def _determinize_state(state: Game, observer_id: int) -> None:
-        opp_id = 1 - observer_id
-        observer = state.players[observer_id]
-        opponent = state.players[opp_id]
+        """
+        Redistributes hidden information (Opponent Hand/Deck) and shuffles Observer Deck.
+        Critical: Preserves 'Known' cards (Observer Hand, Active Candidates) to ensure information consistency.
+        """
+        obs_idx, opp_idx = observer_id, 1 - observer_id
+        observer = state.players[obs_idx]
+        opponent = state.players[opp_idx]
 
-        # Cards currently being chosen from the deck must remain in the deck
-        opp_candidates = opponent.choice_candidates if opponent.choice_pending else []
-        obs_candidates = observer.choice_candidates if observer.choice_pending else []
-
-        # Opponent's unknown pool: hand + deck (excluding candidates being viewed)
-        opp_unknown_pool = []
-        opp_unknown_pool.extend(opponent.hand)
-        for c in opponent.deck.cards:
-            if c not in opp_candidates:
-                opp_unknown_pool.append(c)
-
-        import random
-        random.shuffle(opp_unknown_pool)
-
-        hand_size = len(opponent.hand)
-        opponent.hand = opp_unknown_pool[:hand_size]
-        opponent.deck.cards = opp_unknown_pool[hand_size:] + opp_candidates
+        # --- OBSERVER: Shuffle Deck, Preserve Hand & Candidates ---
+        # Candidates in the deck (e.g. valid targets for specific search) are "Known".
+        # --- OBSERVER: Randomize Deck, Preserve Visible Cards ---
+        obs_cands_ids = {id(c) for c in observer.choice_candidates} if observer.choice_pending else set()
         
-        # Observer's deck shuffle (order is unknown, but candidates are known to stay in deck)
-        obs_deck_pool = [c for c in observer.deck.cards if c not in obs_candidates]
-        random.shuffle(obs_deck_pool)
-        observer.deck.cards = obs_deck_pool + obs_candidates
+        obs_deck_locked = []
+        obs_deck_shufflable = []
+        for c in observer.deck.cards:
+            if id(c) in obs_cands_ids: obs_deck_locked.append(c)
+            else: obs_deck_shufflable.append(c)
+        
+        random.shuffle(obs_deck_shufflable)
+        observer.deck.cards = obs_deck_shufflable + obs_deck_locked
+
+        # --- OPPONENT: Randomize Hand & Deck, Preserve Known Candidates ---
+        opp_cands_ids = {id(c) for c in opponent.choice_candidates} if opponent.choice_pending else set()
+        
+        opp_hand_known = []
+        opp_hand_unknown = []
+        # Hand Pass
+        for c in opponent.hand:
+            if id(c) in opp_cands_ids: opp_hand_known.append(c)
+            else: opp_hand_unknown.append(c)
+        
+        opp_deck_known = []
+        opp_deck_unknown = []
+        # Deck Pass
+        for c in opponent.deck.cards:
+            if id(c) in opp_cands_ids: opp_deck_known.append(c)
+            else: opp_deck_unknown.append(c)
+            
+        unknown_pool = opp_hand_unknown + opp_deck_unknown
+        random.shuffle(unknown_pool)
+        
+        needed_for_hand = len(opponent.hand) - len(opp_hand_known)
+        opponent.hand = opp_hand_known + unknown_pool[:needed_for_hand] 
+        opponent.deck.cards = unknown_pool[needed_for_hand:] + opp_deck_known
 
     def _simulation(self, state:Game, weights_cache: dict) -> float:
-        temp_state = state.clone()
         depth = 0
-        while temp_state.winner == Winner.NONE and depth < 60:
-            moves = get_moves(temp_state.isPlaying, temp_state)
+        while state.winner == Winner.NONE and depth < MCTSConfig.MAX_ROLLOUT_DEPTH:
+            moves = get_moves(state.isPlaying, state)
             if not moves: break
             
-            # Use HEURISTIC select for playouts to build a human-like meta
-            move = self._heuristic_move_select(temp_state, moves, weights_cache)
-            temp_state.receiveAction(temp_state.isPlaying, move[1]['action'], move[1]['args'])
+            # Use FAST rollout policy with Meta Weights
+            move = self._rollout_policy(state, moves, weights_cache)
+            state.receiveAction(state.isPlaying, move[1]['action'], move[1]['args'])
             depth += 1
 
-        winner_id = temp_state.winner
+        winner_id = state.winner
 
         if winner_id != Winner.NONE:
-            # We skip registry update here to avoid polluting stats with simulated games 
-            # and because we switched to tracking "Played Cards" which is hard to extract here without 
-            # tracking the whole simulation path.
-            # Local heuristics will just depend on "Pre-Existing" meta knowledge.
-
             return 1 if winner_id is Winner.PLAYER1 else 0
         else:
-            score = HeuristicAnalyzer.evaluate_state(temp_state, player_id=0)
+            score = HeuristicAnalyzer.evaluate_state(state, player_id=0)
             return (score + 1) / 2
 
     @staticmethod
@@ -303,43 +279,54 @@ class MCTSTree:
             current = current.parent
 
     @staticmethod
-    def _heuristic_move_select(state: Game, moves: list[MoveData], weights_cache: dict) -> MoveData:
-        """Heuristic selection for playouts that balances speed with human-like logic."""
+    def _rollout_policy(state: Game, moves: list[MoveData], weights_cache: dict = None) -> MoveData:
+        """
+        Intelligent Rollout Policy (Restored).
+        Uses HeuristicAnalyzer for tactical depth and MetaRegistry for historical bias.
+        Optimized to use centralized constants from RolloutPolicyWeights.
+        """
         threats = HeuristicAnalyzer.analyze_threats(state, state.isPlaying)
         weights = []
         
+        me = state.players[state.isPlaying]
+        opp = state.players[1 - state.isPlaying]
+
         for card, action_data in moves:
             act_type = action_data['action']
-            base_weight = 10.0
+            base_weight = RolloutPolicyWeights.BASE_WEIGHT
 
+            # 1. Mulligan Logic
             if act_type == Actions.MULLIGAN:
                 mulligan_bonus = HeuristicAnalyzer.evaluate_mulligan(state, state.isPlaying)
                 base_weight += mulligan_bonus
 
-            # 1. Greedy Finisher (Lethal check)
+            # 2. Greedy Finisher (Lethal check) - Instant decision for efficiency
             if act_type == Actions.ATTACK:
-                target_hp = state.players[1 - state.isPlaying].currentHP
-                if state.players[state.isPlaying].currentPower - state.players[1-state.isPlaying].currentTenacity >= target_hp:
+                damage = max(0, me.currentPower - opp.currentTenacity)
+                if damage >= opp.currentHP:
                     return card, action_data
 
-            # 2. Local Logic (Heuristics)
-            micro_bonus = HeuristicAnalyzer.get_micro_heuristic_bonus(card, action_data['args'], state, state.isPlaying, weights_cache=weights_cache)
+            # 3. Micro Heuristics (Deep tactial analysis)
+            micro_bonus = HeuristicAnalyzer.get_micro_heuristic_bonus(
+                card, action_data['args'], state, state.isPlaying, weights_cache=weights_cache
+            )
             base_weight += micro_bonus
 
-            # Anti-Meta awareness in heuristic
-            if threats.wall_threat and 'Buff' in str(card):
-                base_weight += 200.0
+            # 4. Reactive Defensive Logic
+            if threats.wall_threat and card and (CardTag.DEFENSIVE in card.tags or CardTag.SCALER in card.tags):
+                base_weight += RolloutPolicyWeights.WALL_THREAT_REACTIVE_BONUS
 
-            # 3. Meta weights from cache (Fast)
-            card_name = getattr(card, 'name', None)
-            if card_name and card_name in weights_cache:
-                bias, explore = weights_cache[card_name]
-                
-                # Expert logic: In playouts, we trust the meta bias but reduce exploration
-                base_weight += bias + (explore * 0.2)
+            # 5. Meta-Game Knowledge (MetaRegistry)
+            if weights_cache and card:
+                card_name = getattr(card, 'name', None)
+                if card_name and card_name in weights_cache:
+                    bias, explore = weights_cache[card_name]
+                    base_weight += (bias * RolloutPolicyWeights.META_BIAS_MULTIPLIER) + \
+                                   (explore * RolloutPolicyWeights.META_EXPLORE_MULTIPLIER)
 
-            weights.append(max(0.1, base_weight))
+            weights.append(max(RolloutPolicyWeights.MIN_WEIGHT, base_weight))
 
+        # Weighted Sampling (Human-like behavior)
         return random.choices(moves, weights=weights, k=1)[0]
 
 

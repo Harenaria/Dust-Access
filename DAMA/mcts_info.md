@@ -76,12 +76,10 @@ RAVE è impreciso nel breve termine (ignora la tattica). Il **Beta Dinamico** pe
 
 ## 4. Euristiche e Logiche di Dominio
 
-### 4.1 Consistency Enforcement ("God Mode")
-Questa è l'innovazione tecnica critica per supportare la natura "Combo" di *Dust Access*.
-A causa della *Determinization*, l'ordine del mazzo cambia a ogni simulazione.
-*   *Il Problema:* L'AI pianifica una combo su 2 turni. Al secondo turno, la simulazione rimescola il mazzo e la carta necessaria sparisce. L'AI conclude erroneamente che la combo è inaffidabile.
-*   *La Soluzione:* Se l'albero di ricerca decide di giocare una carta specifica, il simulatore **forza** quella carta nella mano dell'agente (recuperandola dal mazzo).
-*   *Ratio:* Stiamo valutando se la strategia è forte *quando riesce*, non quanto è fortunato il pescare. Questo isola la potenza della carta dalla varianza dello shuffle.
+### 4.1 Information Consistency
+*   **The Problem:** Due to *Determinization*, hidden cards (deck/opponent hand) are reshuffled every iteration. This could lead to an AI planning a move with a card that "teleports" away in the next simulation step, causing artificial failures in the tree.
+*   **The Solution:** The `_determinize_state` method now identifies and "locks" all cards currently visible to the observer (Hand, Choice Candidates) before shuffling the unknown pool.
+*   **Ratio:** By maintaining zone-specific consistency for known entities, we ensure that every path explored in the MCTS tree is actually reachable and executable in the real game state without needing artificial state corrections.
 
 ### 4.2 Analisi delle Minacce (`HeuristicAnalyzer`)
 Nei playout (la fase casuale), l'AI non gioca a caso ma usa logiche minime per evitare partite senza senso:

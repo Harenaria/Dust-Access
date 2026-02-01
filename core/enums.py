@@ -58,4 +58,13 @@ class Counter(StrEnum):
     KAI = 'Kai'
     RAGE = 'Rage'
     MOMENTUM = 'Momentum'
+
+class CardTag(Enum):
+    GENERATOR = auto()  # Rage, Kai, Draw
+    CONSUMER = auto()   # Scales with Rage/Kai
+    FINISHER = auto()    # Level 5+ or high damage
+    DEFENSIVE = auto()   # Heal, Tenacity, Shield
+    COUNTER = auto()     # Nullify, Discard, Unequip
+    SCALER = auto()      # Permanent stat buffs
+    COMBO = auto()       # Chains or Sets
 #---------------------------

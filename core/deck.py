@@ -79,10 +79,15 @@ class Deck(DataclassJSONCapable):
         if not self.cards:
             self._build_from_csv()
         elif self.cards and isinstance(self.cards[0], dict):
-            self.cards = [self.deserialize_card(c) for c in self.cards]
+            new_cards = []
+            for c in self.cards:
+                instance = self.deserialize_card(c)
+                if instance:
+                    instance.compute_tags()
+                    new_cards.append(instance)
+            self.cards = new_cards
 
-    def clone(self):
-        return Deck(self.id, cards=[c.clone() for c in self.cards])
+
 
     @staticmethod
     def deserialize_card(data: dict):
@@ -174,6 +179,7 @@ class Deck(DataclassJSONCapable):
                 for _ in range(in_deck):
                     try:
                         instance = self._create_card_instance(card_name, card_data)
+                        instance.compute_tags()
                         self.cards.append(instance)
                     except Exception as e:
                         logger.error(f"Failed to create card '{card_name}': {e}")
@@ -231,7 +237,8 @@ class Deck(DataclassJSONCapable):
             'OnNextPlayerTurn': safe_str(data.get('OnNextPlayerTurn')),
             'OnRemove': safe_str(data.get('OnRemove')),
             'WhileinPlay': safe_str(data.get('WhileinPlay')),
-            'Requires': safe_str(data.get('Requires'))
+            'Requires': safe_str(data.get('Requires')),
+            'tags': set()
         }
 
         equip_args = {
