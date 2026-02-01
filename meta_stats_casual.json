@@ -1,0 +1,280 @@
+{
+    "card_stats": {
+        "Large Club": {
+            "wins": 736,
+            "plays": 1013,
+            "turn_sum": 1873,
+            "level": 1,
+            "type": "DUAL",
+            "class": "(WeaponCard(name='Large Club', Text='Power +3\\nThis weapon is Two Handed.\\n\\n1. Attack: Deal damage equal to Power-1 to an enemy.\\n   - It hits -> Gain a Rage counter\\nRage counter: While in play, Power +1. If you miss: Lose all Rage Counters.', Flavor='When the ancient tree withered and died, Jargen used its wood to build this club. This was the beginning of its legend.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.DUAL: 'Dual'>, level=1, cd=1, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.GENERATOR: 1>, <CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods={'playCounter'}, DurabilityIncrease=0, PowerIncrease=3, EfficiencyIncrease=0, TenacityIncrease=0, SensitivityIncrease=0, is2Handed=True, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=-1, OnHit='playCounter(\"Rage\", 1)', OnMiss='removeAllCounters(\"Rage\")'), 'acClass', None)"
+        },
+        "Second Wind": {
+            "wins": 484,
+            "plays": 851,
+            "turn_sum": 4328,
+            "level": 1,
+            "type": "CANTRIP",
+            "class": "(CantripCard(name='Second Wind', Text='Restore HP to your Accessor of a number of points equal to their Sensitivity', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.CANTRIP: 'Cantrip'>, level=1, cd=0, currentCD=0, OnPlay=['HealSelf(Sensitivity,LINEAR,0)'], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.DEFENSIVE: 4>}, called_methods={'HealSelf'}, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Shirt of Bravado": {
+            "wins": 429,
+            "plays": 531,
+            "turn_sum": 2783,
+            "level": 2,
+            "type": "CHEST",
+            "class": "(EquipCard(name='Shirt of Bravado', Text='Power +4', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.CHEST: 'Chest'>, level=2, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=4, EfficiencyIncrease=0, TenacityIncrease=0, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Trusty Brigandine": {
+            "wins": 311,
+            "plays": 364,
+            "turn_sum": 2509,
+            "level": 3,
+            "type": "CHEST",
+            "class": "(EquipCard(name='Trusty Brigandine', Text='Power +2\\nTenacity +3', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.CHEST: 'Chest'>, level=3, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=2, EfficiencyIncrease=0, TenacityIncrease=3, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Battlemaster": {
+            "wins": 661,
+            "plays": 1170,
+            "turn_sum": 6005,
+            "level": 1,
+            "type": "INSTANT",
+            "class": "(SkillCard(name='Battlemaster', Text='Choose one effect. It is active until the end of the turn you activated this skill:\\n1. Power +2\\n2. Tenacity +5', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.INSTANT: 'Instant'>, level=1, cd=3, currentCD=0, OnPlay=[], OnActivate=['TempStat(Power,2)', 'TempStat(Tenacity,5)'], ChoiceLabels=['+2 Power', '+5 Tenacity'], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.SCALER: 6>}, called_methods={'TempStat'}, isInstant=True, ChainsWith='', OnChainActivate=[], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Reload": {
+            "wins": 605,
+            "plays": 1280,
+            "turn_sum": 7039,
+            "level": 1,
+            "type": "CANTRIP",
+            "class": "(CantripCard(name='Reload', Text='Draw a card, then discard a card in your hand.', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.CANTRIP: 'Cantrip'>, level=1, cd=0, currentCD=0, OnPlay=['DrawThenDiscard(1)'], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.GENERATOR: 1>}, called_methods={'DrawThenDiscard'}, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Valor Sallet": {
+            "wins": 83,
+            "plays": 112,
+            "turn_sum": 1279,
+            "level": 5,
+            "type": "HEAD",
+            "class": "(EquipCard(name='Valor Sallet', Text='Power +1\\nTenacity +1\\n\\nSet: \"Valor\" - If there are two or more \"Valor\" equipments on field: gain Power +2 and Tenacity +2', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.HEAD: 'Head'>, level=5, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='checkEquipSet(\"Valor\")', Requires='', tags={<CardTag.FINISHER: 3>, <CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=1, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Blunt Club": {
+            "wins": 930,
+            "plays": 1575,
+            "turn_sum": 2895,
+            "level": 1,
+            "type": "WEAPON",
+            "class": "(WeaponCard(name='Blunt Club', Text='Power +2\\n\\n1. Attack: Deal damage equal to Power-1 to an enemy.\\n   - It hits -> Gain a Rage counter\\nRage counter: While in play, Power +1. If you miss: Lose all Rage Counters.', Flavor='Probably part of an ancient ritual.\\nYou feel a latent power now getting dull.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.WEAPON: 'Weapon'>, level=1, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.GENERATOR: 1>, <CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods={'playCounter'}, DurabilityIncrease=0, PowerIncrease=2, EfficiencyIncrease=0, TenacityIncrease=0, SensitivityIncrease=0, is2Handed=False, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=-1, OnHit='playCounter(\"Rage\", 1)', OnMiss='removeAllCounters(\"Rage\")'), 'acClass', None)"
+        },
+        "Shield Bash": {
+            "wins": 470,
+            "plays": 992,
+            "turn_sum": 5344,
+            "level": 3,
+            "type": "SKILL",
+            "class": "(SkillCard(name='Shield Bash', Text=\"During your target enemy's next turn they are Nullified.\\nNullified: The first time they use an Action, it has no effect.\\n(A off-hand card has to be in play for this card to be in effect)\", Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.SKILL: 'Skill'>, level=3, cd=2, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='NullifyFirstAction()', OnRemove='', WhileinPlay='', Requires='Equip:OFF_HAND', tags=set(), called_methods=set(), isInstant=False, ChainsWith='', OnChainActivate=[], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "The Hero's Polearm": {
+            "wins": 204,
+            "plays": 359,
+            "turn_sum": 2660,
+            "level": 3,
+            "type": "DUAL",
+            "class": "(WeaponCard(name=\"The Hero's Polearm\", Text='Power +1\\nTenacity +3\\nThis weapon is considered Two Handed.\\n\\n1. Attack: Deal damage equal to Power+2 to an enemy.\\n2. Skill - Deflect I: Until your next turn, Tenacity +1 during the first damage Action you are the target of.\\n - if it misses -> gain a Momentum counter. You lose it at the end of your next turn.\\n\\nMomentum counter: During your Duel phase, you can remove it from game to make a learnt Skill ready.', Flavor=\"The towns of Queensdale still remember of a folk hero that fought with a farming tool and that one day disappeared.\\nHe's treated as the guardian angel of all children, expecially orphans.\", acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.DUAL: 'Dual'>, level=3, cd=1, currentCD=0, OnPlay=[], OnActivate=['Deflect(1)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.DEFENSIVE: 4>, <CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods={'Deflect'}, DurabilityIncrease=0, PowerIncrease=1, EfficiencyIncrease=0, TenacityIncrease=3, SensitivityIncrease=0, is2Handed=True, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=2, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Devious Eyepatch": {
+            "wins": 383,
+            "plays": 554,
+            "turn_sum": 2329,
+            "level": 1,
+            "type": "HEAD",
+            "class": "(EquipCard(name='Devious Eyepatch', Text='Power +2', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.HEAD: 'Head'>, level=1, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=2, EfficiencyIncrease=0, TenacityIncrease=0, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Caligae": {
+            "wins": 343,
+            "plays": 500,
+            "turn_sum": 2829,
+            "level": 2,
+            "type": "BOOTS",
+            "class": "(EquipCard(name='Caligae', Text='\\nPower +1\\n\\n- Gain Power +1 while you have no Dual Weapon on field.', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.BOOTS: 'Boots'>, level=2, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='gainXY_if_notZ_onField(\"Tenacity\", 1, \"Dual\")', Requires='', tags={<CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=1, EfficiencyIncrease=0, TenacityIncrease=0, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Brave Bracers": {
+            "wins": 339,
+            "plays": 477,
+            "turn_sum": 2785,
+            "level": 2,
+            "type": "BRACERS",
+            "class": "(EquipCard(name='Brave Bracers', Text='\\nTenacity +1\\n\\n- Gain Tenacity +1 while you have no Off-Hand Equip on field.', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.BRACERS: 'Bracers'>, level=2, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='gainXY_if_notZ_onField(\"Tenacity\", 1, \"Off-Hand\")', Requires='', tags={<CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=0, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Moon Cleave": {
+            "wins": 268,
+            "plays": 569,
+            "turn_sum": 3194,
+            "level": 2,
+            "type": "SKILL",
+            "class": "(SkillCard(name='Moon Cleave', Text='Deal Efficiency damage to all enemies.', Flavor='The legend says that when the Saint fenced with their enemies, their sword shone bright like a silver moon in a dark night.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.SKILL: 'Skill'>, level=2, cd=0, currentCD=0, OnPlay=[], OnActivate=['Damage(Efficiency,LINEAR,0)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.FINISHER: 3>}, called_methods={'Damage'}, isInstant=False, ChainsWith='', OnChainActivate=[], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Reckless Push": {
+            "wins": 475,
+            "plays": 937,
+            "turn_sum": 4917,
+            "level": 1,
+            "type": "CANTRIP",
+            "class": "(CantripCard(name='Reckless Push', Text='If you already used your Tactical Action, gain one more.', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.CANTRIP: 'Cantrip'>, level=1, cd=0, currentCD=0, OnPlay=['ifUsedBonusRegain()'], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='UsedAction:Tactical', tags={<CardTag.GENERATOR: 1>}, called_methods={'ifUsedBonusRegain'}, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Gladius": {
+            "wins": 332,
+            "plays": 759,
+            "turn_sum": 1705,
+            "level": 1,
+            "type": "WEAPON",
+            "class": "(WeaponCard(name='Gladius', Text='Power +2\\n\\n1. Attack: Deal damage equal to Power to an enemy.', Flavor='This blade has been passed from old to new gladiators as a memento mori.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.WEAPON: 'Weapon'>, level=1, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=2, EfficiencyIncrease=0, TenacityIncrease=0, SensitivityIncrease=0, is2Handed=False, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=0, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Furious Fencing": {
+            "wins": 495,
+            "plays": 925,
+            "turn_sum": 5269,
+            "level": 5,
+            "type": "INSTANT",
+            "class": "(SkillCard(name='Furious Fencing', Text='Deal Efficiency+5 damage to a target enemy', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.INSTANT: 'Instant'>, level=5, cd=3, currentCD=0, OnPlay=[], OnActivate=['Damage(Efficiency,LINEAR,5)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.FINISHER: 3>}, called_methods={'Damage'}, isInstant=True, ChainsWith='', OnChainActivate=[], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Skullsplitter": {
+            "wins": 489,
+            "plays": 927,
+            "turn_sum": 5151,
+            "level": 5,
+            "type": "SKILL",
+            "class": "(SkillCard(name='Skullsplitter', Text='If you have a Two Handed weapon equipped, deal Power damage and make your enemy incapable of using Tactical Actions during their first turn.', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.SKILL: 'Skill'>, level=5, cd=2, currentCD=0, OnPlay=[], OnActivate=['SkullSplitter()'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='2H', tags={<CardTag.FINISHER: 3>, <CardTag.COUNTER: 5>}, called_methods={'SkullSplitter'}, isInstant=False, ChainsWith='', OnChainActivate=[], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Mercenary Longsword": {
+            "wins": 227,
+            "plays": 363,
+            "turn_sum": 2731,
+            "level": 3,
+            "type": "WEAPON",
+            "class": "(WeaponCard(name='Mercenary Longsword', Text='Power +3\\nTenacity +1\\n\\n1. Attack: Deal damage equal to Power to an enemy.', Flavor='The Band of the Red Ox used this sword as the tombstone of their leader.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.WEAPON: 'Weapon'>, level=3, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=3, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0, is2Handed=False, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=0, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Father's Billhook": {
+            "wins": 238,
+            "plays": 1058,
+            "turn_sum": 1934,
+            "level": 1,
+            "type": "DUAL",
+            "class": "(WeaponCard(name=\"Father's Billhook\", Text='Power +2\\nTenacity +1\\nThis weapon is considered Two Handed.\\n\\n1. Attack: Deal damage equal to Power to an enemy.\\n2. Skill - Deflect I: Until your next turn, Tenacity +1 during the first damage Action you are the target of.\\n - if it misses -> gain a Momentum counter. You lose it at the end of your next turn.\\n\\nMomentum counter: During your Duel phase, you can remove it from game to make a learnt Skill ready.', Flavor=\"After the farm burned down, a young man that lost everything clinged to this weapon like it was the family he didn't have anymore.\", acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.DUAL: 'Dual'>, level=1, cd=1, currentCD=0, OnPlay=[], OnActivate=['Deflect(1)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.DEFENSIVE: 4>, <CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods={'Deflect'}, DurabilityIncrease=0, PowerIncrease=1, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0, is2Handed=True, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=0, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Steel Slash": {
+            "wins": 499,
+            "plays": 953,
+            "turn_sum": 5011,
+            "level": 2,
+            "type": "SKILL",
+            "class": "(SkillCard(name='Steel Slash', Text='Deal Efficiency+1 damage to a target enemy.\\n\\nChain [Brave Blade]', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.SKILL: 'Skill'>, level=2, cd=0, currentCD=0, OnPlay=[], OnActivate=['Damage(Efficiency,LINEAR,1)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.COMBO: 7>, <CardTag.FINISHER: 3>}, called_methods={'Damage'}, isInstant=False, ChainsWith='Brave Blade', OnChainActivate=[], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Brave Blade": {
+            "wins": 511,
+            "plays": 954,
+            "turn_sum": 5263,
+            "level": 4,
+            "type": "SKILL",
+            "class": "(SkillCard(name='Brave Blade', Text='If it was Chained: Deal Efficiency+5 damage to a target enemy.\\n\\nIf it was not Chained: Deal Efficiency+2 damage to a target enemy.\\n\\nChain [Lacerating Lunge]', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.SKILL: 'Skill'>, level=4, cd=1, currentCD=0, OnPlay=[], OnActivate=['Damage(Efficiency,LINEAR,2)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.COMBO: 7>, <CardTag.FINISHER: 3>}, called_methods={'Damage'}, isInstant=False, ChainsWith='Lacerating Lunge', OnChainActivate=['Damage(Efficiency,LINEAR,5)'], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Lacerating Lunge": {
+            "wins": 263,
+            "plays": 503,
+            "turn_sum": 2885,
+            "level": 5,
+            "type": "SKILL",
+            "class": "(SkillCard(name='Lacerating Lunge', Text='If it was Chained: Deal Power damage to a target enemy.\\n\\nIf it was not Chained: Deal Efficiency+3 damage to a target enemy.', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.SKILL: 'Skill'>, level=5, cd=1, currentCD=0, OnPlay=[], OnActivate=['Damage(Efficiency,LINEAR,3)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.FINISHER: 3>}, called_methods={'Damage'}, isInstant=False, ChainsWith='', OnChainActivate=['Damage(Power,LINEAR,0)'], OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Trusty Helmet": {
+            "wins": 206,
+            "plays": 348,
+            "turn_sum": 2572,
+            "level": 3,
+            "type": "HEAD",
+            "class": "(EquipCard(name='Trusty Helmet', Text='Tenacity +1', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.HEAD: 'Head'>, level=3, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=0, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Kite Shield": {
+            "wins": 104,
+            "plays": 152,
+            "turn_sum": 1232,
+            "level": 3,
+            "type": "OFF-HAND",
+            "class": "(EquipCard(name='Kite Shield', Text='Tenacity +2\\n\\n1. Skill - Shield: Until your next turn, the first damage Action you are the target of misses.', Flavor=\"Julia, acting commander of the Band of the Red Ox after her lover's death, swore to his tomb that she'll keep everyone else alive in his absence.\", acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.OFF_HAND: 'Off-Hand'>, level=3, cd=2, currentCD=0, OnPlay=[], OnActivate=['Shield()'], ChoiceLabels=[], OnNextTurn='RemoveShield()', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.DEFENSIVE: 4>, <CardTag.SCALER: 6>}, called_methods={'Shield'}, DurabilityIncrease=0, PowerIncrease=0, EfficiencyIncrease=0, TenacityIncrease=2, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Tower Shield": {
+            "wins": 31,
+            "plays": 52,
+            "turn_sum": 635,
+            "level": 5,
+            "type": "OFF-HAND",
+            "class": "(EquipCard(name='Tower Shield', Text='Tenacity +3\\n\\n1. Skill - Cover V: Gain Tenacity +5 until your next turn.', Flavor='The shield of Julia, known as the Iron Angel, the Valkyrie or the Shieldmaiden based on the song you hear. She kept fighting and defending soldiers on the battlefield even after the Band of The Red Ox was disbanded.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.OFF_HAND: 'Off-Hand'>, level=5, cd=3, currentCD=0, OnPlay=[], OnActivate=['Cover(5)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.DEFENSIVE: 4>, <CardTag.FINISHER: 3>, <CardTag.SCALER: 6>}, called_methods={'Cover'}, DurabilityIncrease=0, PowerIncrease=0, EfficiencyIncrease=0, TenacityIncrease=3, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Wooden Shield": {
+            "wins": 131,
+            "plays": 289,
+            "turn_sum": 1443,
+            "level": 1,
+            "type": "OFF-HAND",
+            "class": "(EquipCard(name='Wooden Shield', Text='Tenacity +1\\n\\n1. Skill - Cover II: Gain Tenacity +2 until your next turn.', Flavor=\"When Julia was attacked by a drunk mercenary, she defended herself with the tavern's table and punched him until he was sober. It marked the start of a great friendship.\", acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.OFF_HAND: 'Off-Hand'>, level=1, cd=2, currentCD=0, OnPlay=[], OnActivate=['Cover(2)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.DEFENSIVE: 4>, <CardTag.SCALER: 6>}, called_methods={'Cover'}, DurabilityIncrease=0, PowerIncrease=0, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "The Bloody Claw": {
+            "wins": 76,
+            "plays": 101,
+            "turn_sum": 1198,
+            "level": 5,
+            "type": "DUAL",
+            "class": "(WeaponCard(name='The Bloody Claw', Text='Power +4\\nTenacity +3\\nThis weapon is considered Two Handed.\\n\\n1. Attack: Deal damage equal to Power+2 to an enemy.\\n2. Skill - Deflect I: Until your next turn, Tenacity +1 during the first damage Action you are the target of.\\n - if it misses -> gain a Momentum counter. You lose it at the end of your next turn.\\n\\nMomentum counter: During your Duel phase, you can remove it from game to make a learnt Skill ready.', Flavor='A crazy cannibal lives in the forest near Queensdale and attacks people on sight. His weapon is a twisted and rusted billhook, always drenched in blood.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.DUAL: 'Dual'>, level=5, cd=1, currentCD=0, OnPlay=[], OnActivate=['Deflect(1)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.DEFENSIVE: 4>, <CardTag.FINISHER: 3>, <CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods={'Deflect'}, DurabilityIncrease=0, PowerIncrease=4, EfficiencyIncrease=0, TenacityIncrease=3, SensitivityIncrease=0, is2Handed=True, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=2, OnHit='', OnMiss=''), 'acClass', None)"
+        },
+        "Valor Leg Guards": {
+            "wins": 84,
+            "plays": 121,
+            "turn_sum": 1362,
+            "level": 5,
+            "type": "BOOTS",
+            "class": "(EquipCard(name='Valor Leg Guards', Text='Power +1\\nTenacity +1\\n\\nSet: \"Valor\" - If there are two or more \"Valor\" equipments on field: gain Power +2 and Tenacity +2', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.BOOTS: 'Boots'>, level=5, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='checkEquipSet(\"Valor\")', Requires='', tags={<CardTag.FINISHER: 3>, <CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=1, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Valor Gauntlets": {
+            "wins": 79,
+            "plays": 108,
+            "turn_sum": 1211,
+            "level": 5,
+            "type": "BRACERS",
+            "class": "(EquipCard(name='Valor Gauntlets', Text='Power +1\\nTenacity +1\\n\\nSet: \"Valor\" - If there are two or more \"Valor\" equipments on field: gain Power +2 and Tenacity +2', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.BRACERS: 'Bracers'>, level=5, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='checkEquipSet(\"Valor\")', Requires='', tags={<CardTag.FINISHER: 3>, <CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=1, EfficiencyIncrease=0, TenacityIncrease=1, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Valor Half-Plate": {
+            "wins": 96,
+            "plays": 126,
+            "turn_sum": 1482,
+            "level": 5,
+            "type": "CHEST",
+            "class": "(EquipCard(name='Valor Half-Plate', Text='Power +3\\nTenacity +3\\n\\nSet: \"Valor\" - If there are two or more \"Valor\" equipments on field: gain Power +2 and Tenacity +2', Flavor='', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.CHEST: 'Chest'>, level=5, cd=0, currentCD=0, OnPlay=[], OnActivate=[], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='checkEquipSet(\"Valor\")', Requires='', tags={<CardTag.FINISHER: 3>, <CardTag.SCALER: 6>}, called_methods=set(), DurabilityIncrease=0, PowerIncrease=3, EfficiencyIncrease=0, TenacityIncrease=3, SensitivityIncrease=0), 'acClass', None)"
+        },
+        "Sword of the Saint": {
+            "wins": 45,
+            "plays": 61,
+            "turn_sum": 727,
+            "level": 5,
+            "type": "WEAPON",
+            "class": "(WeaponCard(name='Sword of the Saint', Text='Power +4\\nTenacity +2\\n1. Attack: Deal damage equal to Power to an enemy.\\n2. Skill - Kai: Get 3 Kai counters\\n\\nKai counter: The next damage Skill deals damage equal to Power instead of their regular value. You cannot have an Off-Hand Equip on field to use this.', Flavor='The Saint, a mysterious swordman, fought their whole life dueling using this sword.\\nWhen they lost both their arms, the legend tells that this sword was attached to their right arm prothesis.', acClass=<AccessorClass.HEAVY: 'Heavy'>, cardType=<CardType.WEAPON: 'Weapon'>, level=5, cd=1, currentCD=0, OnPlay=[], OnActivate=['playCounter(\"Kai\", 3)'], ChoiceLabels=[], OnNextTurn='', OnNextPlayerTurn='', OnRemove='', WhileinPlay='', Requires='', tags={<CardTag.GENERATOR: 1>, <CardTag.FINISHER: 3>, <CardTag.SCALER: 6>, <CardTag.CONSUMER: 2>}, called_methods={'playCounter'}, DurabilityIncrease=0, PowerIncrease=4, EfficiencyIncrease=0, TenacityIncrease=2, SensitivityIncrease=0, is2Handed=False, AtkStat=<Stats.POWER: 'Power'>, AtkFunc=<Scaling.LINEAR: 'LINEAR'>, AtkCoeff=0, OnHit='', OnMiss=''), 'acClass', None)"
+        }
+    },
+    "deck_stats": {},
+    "matchup_stats": {
+        "0": {
+            "wins": 1610,
+            "plays": 3220,
+            "swinginess": 43.74623700924009,
+            "interactivity": 56436,
+            "comebacks": 46,
+            "total_turns": 34716
+        },
+        "0_vs_0": {
+            "wins": 1610,
+            "plays": 3220,
+            "swinginess": 43.74623700924009,
+            "interactivity": 56436,
+            "comebacks": 46,
+            "total_turns": 34716
+        }
+    },
+    "total_simulations": 1610.0
+}
