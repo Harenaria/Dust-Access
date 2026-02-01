@@ -98,8 +98,14 @@ class MCTSConfig:
     RAVE_B_PARAM: Final[float] = 0.05
     # Default winrate assumed for nodes with 0 visits in AMAF statistics.
     AMAF_DEFAULT_WR: Final[float] = 0.5
-    # Standard UCB1 exploration constant.
-    EXPLORATION_CONSTANT: Final[float] = 2.0
+    # UCT Exploration Coefficient (Cp).
+    # Theoretical value is √2 ≈ 1.41 for rewards in [0,1], but domain-specific tuning is standard
+    # (Browne et al., 2012). Studies on card games with imperfect information (e.g., Hearts)
+    # found optimal Cp values below 0.5 due to limited branching. However, ECGs like Dust Access
+    # have higher complexity (combos, equipment, resources), requiring more exploration.
+    # We use 0.7 as a middle ground: lower than √2 because RAVE and HeuristicAnalyzer provide
+    # strong priors, but higher than trick-taking games due to strategic depth.
+    UCT_EXPLORATION_CP: Final[float] = 0.7
     # Maximum simulation depth (turns) per playout.
     MAX_ROLLOUT_DEPTH: Final[int] = 60
     # Probability of making a random move during playouts (vs heuristic move).
