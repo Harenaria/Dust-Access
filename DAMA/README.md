@@ -17,10 +17,10 @@ The core decision-making engine of DAMA is based on the **Monte Carlo Tree Searc
 1.  **Selection**: Navigating from the root node to a leaf node by recursively applying a selection policy that balances exploitation of high-reward branches and exploration of uncertain frontiers.
 2.  **Expansion**: Appending one or more child nodes to the search frontier, representing previously unexplored legal transitions within the game's state space.
 3.  **Simulation (Monotonic Rollout)**: Executing a rapid playout from the newly expanded state to a terminal condition (win/loss/draw), providing a noisy estimate of the node's theoretical value.
-4.  **Backpropagation**: Propagating the final outcome upstream through the traversed path, updating the statistical distribution (visit count $n$ and cumulative reward $w$) for all ancestor nodes.
+4.  **Backpropagation**: Propagating the outcome upstream through the traversed path, updating the statistical distribution (visit count $n$ and cumulative reward $w$) for all ancestor nodes.
 
 #### Selection Policy: The UCT Algorithm
-DAMA utilizes the **Upper Confidence Bound applied to Trees (UCT)** as its primary selection mechanism, ensuring asymptotic convergence to the minimax optimum:
+DAMA uses the **Upper Confidence Bound applied to Trees (UCT)** as its primary selection mechanism, ensuring asymptotic convergence to the minimax optimum:
 
 $$UCT = \bar{X}_j + C_p \sqrt{\frac{2 \ln n}{n_j}}$$
 
@@ -36,7 +36,7 @@ Traditional MCTS assumes perfect information. To address the latent variables in
 Rather than operating on individual game states, the algorithm operates over **Information Sets**, collections of states that are indistinguishable to the acting agent. This prevents the "cheating" bias prevalent in standard MCTS and ensures the agent's decisions are based strictly on observable data and statistical inference.
 
 #### Determinization and Information Consistency
-Search iterations utilize **Determinization**, wherein hidden state variables are instantiated by sampling from the distribution of unknown cards. DAMA incorporates an **Information Consistency Lock**: known entities (such as the observer's hand and activated choice candidates) are excluded from the permutation process, ensuring that all explored trajectories are topologically consistent with the actual game state.
+Search iterations use **Determinization**, wherein hidden state variables are instantiated by sampling from the distribution of unknown cards. DAMA incorporates an **Information Consistency Lock**: known entities (such as the observer's hand and activated choice candidates) are excluded from the permutation process, ensuring that all explored trajectories are topologically consistent with the actual game state.
 
 #### RAVE and Rapid Strategic Convergence
 To mitigate the "cold start" problem in deep search trees, DAMA integrates **Rapid Action Value Estimation (RAVE)**. RAVE leverages the "All-Moves-As-First" (AMAF) heuristic, allowing the agent to generalize the value of a move across different branches of the tree.
@@ -62,5 +62,5 @@ Evaluation is conducted across three discrete search tiers to isolate specific c
 ## References and Formal Literature
 
 *   **Original ISMCTS Framework**: Cowling, P. I., Powley, E. J., & Whitehouse, D. (2012). *Information Set Monte Carlo Tree Search*. IEEE Transactions on Computational Intelligence and AI in Games. [Link to Paper](https://ieeexplore.ieee.org/document/6203567/)
-*   **Search Principles**: Browne, C. B., et al. (2012). *A Survey of Monte Carlo Tree Search Methods*. IEEE Transactions on Computational Intelligence and AI in Games.
+*   **Search Principles**: Browne, C. B. et al. (2012). *A Survey of Monte Carlo Tree Search Methods*. IEEE Transactions on Computational Intelligence and AI in Games.
 *   **Implementation Manifest**: Technical details regarding RAVE and UCT calibration can be found in [DAMA/tree.py](tree.py).
