@@ -13,11 +13,13 @@ class Actions(Enum):
     MULLIGAN = auto()
     DISCARD = auto()
     DRAW = auto()
-    PLAY = auto()
+    LEARN = auto()
+    CAST = auto()
     EQUIP = auto()
     ACTIVATE = auto()
     ATTACK = auto()
     END_TURN = auto()
+    CHOOSE_REWARD = auto()
 
 class Winner(Enum):
     NONE = 0
@@ -41,6 +43,7 @@ class CardType(StrEnum):
     SKILL = 'Skill'
     INSTANT = 'Instant'
     CANTRIP = 'Cantrip'
+    COUNTER = 'Counter'
 class Stats(StrEnum):
     DURABILITY = 'Durability'
     POWER = 'Power'
@@ -51,6 +54,17 @@ class Scaling(StrEnum):
     LINEAR = 'LINEAR'
     MULTIPLICATIVE = 'MULTIPLICATIVE'
 class Counter(StrEnum):
+    VALOR = 'Set: Valor'
+    KAI = 'Kai'
     RAGE = 'Rage'
     MOMENTUM = 'Momentum'
+
+class CardTag(Enum):
+    GENERATOR = auto()  # Rage, Kai, Draw
+    CONSUMER = auto()   # Scales with Rage/Kai
+    FINISHER = auto()    # Level 5+ or high damage
+    DEFENSIVE = auto()   # Heal, Tenacity, Shield
+    COUNTER = auto()     # Nullify, Discard, Unequip
+    SCALER = auto()      # Permanent stat buffs
+    COMBO = auto()       # Chains or Sets
 #---------------------------

@@ -1,3 +1,12 @@
+.gemini_api
+sessions.json
+sessions.json.tmp
+/TODO.txt
+.runlogs/
+
+# Railway cache
+.railway/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

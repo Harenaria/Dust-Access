@@ -1,182 +1,343 @@
 import random
+from dataclasses import dataclass, field
+
 import pandas as pd
+import os
+import logging
+
+from pandas import DataFrame
 from core import card
 from core import enums
+from core.serialization import DataclassJSONCapable
+
+# Logging
+logger = logging.getLogger("DeckBuilder")
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+_CARDS_DB: DataFrame | None = None
+_SPEC_DB: DataFrame | None = None
 
 
-def validate_deck(deck_id: int):
-    """Validates a deck: must have exactly 60 cards and max 3 copies per card.
-    Returns (is_valid, error_message) tuple."""
+def get_cards_db() -> pd.DataFrame:
+    global _CARDS_DB
+    if _CARDS_DB is None:
+        path = os.path.join(DATA_DIR, "Cards.csv")
+        if not os.path.exists(path):
+            logger.error(f"CRITICAL: Cards DB not found at {path}")
+            return pd.DataFrame()
+
+        try:
+            df = pd.read_csv(path)
+            df.set_index("Name", inplace=True)
+
+            defaults = {
+                'PowerIncrease': 0, 'TenacityIncrease': 0, 'EfficiencyIncrease': 0,
+                'SensitivityIncrease': 0, 'DurabilityIncrease': 0, 'AtkCoeff': 0,
+                'CD': 0, 'Level': 1, 'is2Handed': 0,
+                'Text': '', 'Flavor': '', 'OnPlay': '', 'OnActivate': '',
+                'OnHit': '', 'OnMiss': '', 'ChainsWith': '', 'OnChainActivate': '',
+                'WhileinPlay': '', 'ChoiceLabels': '', 'Requires': ''
+            }
+            df.fillna(defaults, inplace=True)
+            _CARDS_DB = df
+            logger.info(f"Loaded Cards DB with {len(df)} cards.")
+        except Exception as e:
+            logger.error(f"Error loading Cards.csv: {e}")
+            return pd.DataFrame()
+
+    return _CARDS_DB
+
+
+def get_specializations_db() -> pd.DataFrame:
+    global _SPEC_DB
+    if _SPEC_DB is None:
+        path = os.path.join(DATA_DIR, "Specializations.csv")
+        if not os.path.exists(path):
+            return pd.DataFrame()
+        df = pd.read_csv(path)
+        df.set_index("Name", inplace=True)
+        _SPEC_DB = df
+    return _SPEC_DB
+
+
+def get_base_specializations_db() -> pd.DataFrame:
+    df = get_specializations_db()
+    if df.empty: return df
+    return df[df['isBase'] == 1]
+
+@dataclass
+class Deck(DataclassJSONCapable):
+    id:int
+    cards:list = field(default_factory=list)
+
+    def __post_init__(self):
+        # If 'cards' is empty, it means we are creating a NEW deck.
+        # If 'cards' is NOT empty, it means we are deserializing a saved deck/game,
+        # so we skip the CSV building process.
+        if not self.cards:
+            self._build_from_csv()
+        elif self.cards and isinstance(self.cards[0], dict):
+            new_cards = []
+            for c in self.cards:
+                instance = self.deserialize_card(c)
+                if instance:
+                    instance.compute_tags()
+                    new_cards.append(instance)
+            self.cards = new_cards
+
+
+
+    @staticmethod
+    def deserialize_card(data: dict):
+        """Reconstructs a Card object from a dictionary."""
+        # Convert string Enums back to Enum objects
+        if 'cardType' in data and isinstance(data['cardType'], str):
+            try:
+                data['cardType'] = enums.CardType(data['cardType'])
+            except ValueError:
+                pass  # Keep as string or handle error
+
+        if 'acClass' in data and isinstance(data['acClass'], str):
+            try:
+                data['acClass'] = enums.AccessorClass(data['acClass'])
+            except ValueError:
+                pass
+
+        c_type = data.get('cardType')
+
+        # Instantiate based on type
+        # Note: We filter kwargs to avoid 'unexpected argument' errors if JSON has extra fields
+        try:
+            if c_type in [enums.CardType.WEAPON, enums.CardType.DUAL]:
+                # Handle nested Enums for Weapons
+                if 'AtkStat' in data and isinstance(data['AtkStat'], str): data['AtkStat'] = enums.Stats(
+                    data['AtkStat'])
+                if 'AtkFunc' in data and isinstance(data['AtkFunc'], str): data['AtkFunc'] = enums.Scaling(
+                    data['AtkFunc'])
+                return card.WeaponCard(**data)
+
+            elif c_type in [enums.CardType.HEAD, enums.CardType.CHEST, enums.CardType.BRACERS,
+                            enums.CardType.BOOTS, enums.CardType.OFF_HAND]:
+                return card.EquipCard(**data)
+
+            elif c_type in [enums.CardType.SKILL, enums.CardType.INSTANT]:
+                return card.SkillCard(**data)
+
+            elif c_type == enums.CardType.CANTRIP:
+                return card.CantripCard(**data)
+
+            elif c_type == enums.CardType.COUNTER:
+                return card.Card(**data)
+
+            else:
+                return card.Card(**data)
+        except TypeError:
+            # Fallback if strict typing fails, return generic Card
+            return card.Card(**data)
+
+
+    def _build_from_csv(self):
+        # Converting DataFrame to Dictionary once for O(1) lookup and correct typing
+        db_df = get_cards_db()
+        cards_library = db_df.to_dict(orient='index')
+
+        deck_path = os.path.join(DATA_DIR, f"{self.id}.csv")
+
+        logger.info(f"Building Deck {self.id}...")
+
+        if not os.path.exists(deck_path):
+            logger.error(f"Deck file {deck_path} not found.")
+            return
+
+        try:
+            deck_list_df = pd.read_csv(deck_path)
+
+            if 'isSpec' not in deck_list_df.columns:
+                deck_list_df['isSpec'] = 0
+
+            deck_list_df['isSpec'] = pd.to_numeric(deck_list_df['isSpec'].fillna(0), errors='coerce').astype(int)
+
+            for _, row in deck_list_df.iterrows():
+                if row['isSpec'] == 1:
+                    continue
+
+                card_name = row['Name']
+
+                try:
+                    in_deck = int(float(row['in_deck']))
+                except:
+                    in_deck = 1
+
+                card_data = cards_library.get(card_name)
+
+                if not card_data:
+                    logger.warning(f"Skipping unknown card '{card_name}' in deck {self.id}")
+                    continue
+
+                for _ in range(in_deck):
+                    try:
+                        instance = self._create_card_instance(card_name, card_data)
+                        instance.compute_tags()
+                        self.cards.append(instance)
+                    except Exception as e:
+                        logger.error(f"Failed to create card '{card_name}': {e}")
+
+            random.shuffle(self.cards)
+            logger.info(f"Deck {self.id} ready: {len(self.cards)} cards.")
+
+        except Exception as e:
+            logger.error(f"Critical error building deck {self.id}: {e}")
+
+    @staticmethod
+    def _create_card_instance(name, data):
+        def safe_int(val, default=0):
+            try:
+                return int(float(val))
+            except:
+                return default
+
+        def safe_str(val):
+            if pd.isna(val): return ""
+            return str(val)
+
+        def safe_list(val, separator='||'):
+            """Parse ||-separated string into list of effects"""
+            if pd.isna(val) or not val:
+                return []
+            s = str(val).strip()
+            if not s:
+                return []
+            return [part.strip() for part in s.split(separator) if part.strip()]
+
+        try:
+            c_type = enums.CardType(data['Type'])
+        except:
+            c_type = enums.CardType.BASE
+
+        try:
+            c_class = enums.AccessorClass(data['Class'])
+        except:
+            c_class = enums.AccessorClass.HEAVY
+
+        base_args = {
+            'name': name,
+            'Text': safe_str(data.get('Text')),
+            'Flavor': safe_str(data.get('Flavor')),
+            'acClass': c_class,
+            'cardType': c_type,
+            'level': safe_int(data.get('Level'), 1),
+            'cd': safe_int(data.get('CD'), 0),
+            'currentCD': 0,
+            'OnPlay': safe_list(data.get('OnPlay')),
+            'OnActivate': safe_list(data.get('OnActivate')),
+            'ChoiceLabels': safe_list(data.get('ChoiceLabels')),
+            'OnNextTurn': safe_str(data.get('OnNextTurn')),
+            'OnNextPlayerTurn': safe_str(data.get('OnNextPlayerTurn')),
+            'OnRemove': safe_str(data.get('OnRemove')),
+            'WhileinPlay': safe_str(data.get('WhileinPlay')),
+            'Requires': safe_str(data.get('Requires')),
+            'tags': set()
+        }
+
+        equip_args = {
+            'DurabilityIncrease': safe_int(data.get('DurabilityIncrease')),
+            'PowerIncrease': safe_int(data.get('PowerIncrease')),
+            'EfficiencyIncrease': safe_int(data.get('EfficiencyIncrease')),
+            'TenacityIncrease': safe_int(data.get('TenacityIncrease')),
+            'SensitivityIncrease': safe_int(data.get('SensitivityIncrease')),
+        }
+
+        if c_type in [enums.CardType.WEAPON, enums.CardType.DUAL]:
+            try:
+                stat = enums.Stats(data.get('AtkStat'))
+            except:
+                stat = enums.Stats.POWER
+            try:
+                func = enums.Scaling(data.get('AtkFunc'))
+            except:
+                func = enums.Scaling.LINEAR
+
+            return card.WeaponCard(
+                **base_args, **equip_args,
+                is2Handed=(c_type == enums.CardType.DUAL),
+                AtkStat=stat,
+                AtkFunc=func,
+                AtkCoeff=safe_int(data.get('AtkCoeff')),
+                OnHit=safe_str(data.get('OnHit')),
+                OnMiss=safe_str(data.get('OnMiss'))
+            )
+
+        elif c_type in [enums.CardType.HEAD, enums.CardType.CHEST, enums.CardType.BRACERS,
+                        enums.CardType.BOOTS, enums.CardType.OFF_HAND]:
+            return card.EquipCard(**base_args, **equip_args)
+
+        elif c_type in [enums.CardType.SKILL, enums.CardType.INSTANT]:
+            return card.SkillCard(
+                **base_args,
+                isInstant=(c_type == enums.CardType.INSTANT),
+                ChainsWith=safe_str(data.get('ChainsWith')),
+                OnChainActivate=safe_list(data.get('OnChainActivate')),
+                OnHit=safe_str(data.get('OnHit')),
+                OnMiss=safe_str(data.get('OnMiss'))
+            )
+
+        elif c_type == enums.CardType.CANTRIP:
+            return card.CantripCard(
+                **base_args,
+                OnHit=safe_str(data.get('OnHit')),
+                OnMiss=safe_str(data.get('OnMiss'))
+            )
+
+        else:
+            return card.Card(**base_args)
+
+
+def validate_deck(deck_id: int) -> tuple[bool, str]:
     try:
-        df = pd.read_csv(f"./data/{deck_id}.csv")
+        df = pd.read_csv(os.path.join(DATA_DIR, f"{deck_id}.csv"))
+
+        if 'isSpec' not in df.columns: df['isSpec'] = 0
+        df['isSpec'] = pd.to_numeric(df['isSpec'].fillna(0), errors='coerce').astype(int)
+
         if 'in_deck' not in df.columns or 'Name' not in df.columns:
-            return False, "Deck file missing required columns"
-        
-        # Filter out specialization entries (they don't count toward 60 cards)
-        loot_cards_df = df[~df['Type'].isin([enums.CardType.BASE, enums.CardType.ADVANCED])]
-        
-        total_cards = loot_cards_df['in_deck'].sum()
-        if total_cards != 60:
-            return False, f"Deck must have exactly 60 cards, found {total_cards}"
-        
-        # Check max 3 copies per card
-        max_copies = loot_cards_df['in_deck'].max()
-        if max_copies > 3:
-            return False, f"Deck has cards with more than 3 copies (max: {max_copies})"
-        
+            return False, "Invalid Format"
+
+        loot_cards = df[df['isSpec'] == 0]
+        count = loot_cards['in_deck'].sum()
+
+        if count != 60:
+            return False, f"Count {count} != 60"
+
         return True, "Valid"
     except Exception as e:
-        return False, f"Error validating deck: {e}"
+        return False, str(e)
 
 
-def get_deck_specializations(deck_id: int):
-    """Extracts available specializations from a deck file.
-    Returns list of specialization names that are marked as available (in_deck > 0)."""
+def get_deck_base_specializations(deck_id: int) -> dict[str, str] | None:
     try:
-        df = pd.read_csv(f"./data/{deck_id}.csv")
-        
-        # Look for specialization entries (Type is "Base", "Advanced", or "SPE")
-        spec_df = df[df['Type'].isin(['Base', 'Advanced'])]
-        
-        # Filter to only those with in_deck > 0 (available)
-        available_specs = spec_df[spec_df['in_deck'] > 0]['Name'].tolist()
-        
-        return available_specs
+        # Load the Global Specializations DB
+        sp = get_base_specializations_db()
+        if 'Name' in sp.columns:
+            sp = sp.set_index('Name')
+
+        # Load the Deck CSV
+        path = os.path.join(DATA_DIR, f"{deck_id}.csv")
+        if not os.path.exists(path):
+            return None
+
+        df = pd.read_csv(path)
+
+        # Filter the DECK to find only rows where isSpec == 1
+        # We fillna(0) to handle empty fields safely before comparing
+        deck_specs = df[df['isSpec'].fillna(0) == 1]['Name']
+
+        # Use the list of names from the deck to filter the global DB
+        valid_specs = sp[sp.index.isin(deck_specs)]
+
+        return valid_specs['Class'].to_dict()
+
     except Exception as e:
-        # If no specializations found or error, return empty list
-        return []
-
-
-# noinspection PyTypeChecker
-class Deck:
-    def __init__(self, deckID:int):
-        self.cards = list()
-        df = pd.read_csv("".join(['./data/', str(deckID), '.csv']))
-        df = df.fillna({
-            'PowerIncrease': 0,
-            'TenacityIncrease': 0,
-            'EfficiencyIncrease': 0,
-            'SensitivityIncrease': 0,
-            'DurabilityIncrease': 0,
-            'AtkCoeff': 0,
-            'CD': 0,
-            'Level': 1,  # Default if empty
-            'is2Handed': 0,  # Default 0 (False)
-            'Text': '',
-            'Flavor': ''
-        })
-
-        # Floats to int (we don't need them)
-        cols_to_int = ['PowerIncrease', 'TenacityIncrease', 'EfficiencyIncrease',
-                       'SensitivityIncrease', 'DurabilityIncrease', 'CD', 'Level']
-        for col in cols_to_int:
-            if col in df.columns:
-                df[col] = df[col].astype(int)
-
-        
-        # Filter out specialization entries - they're not part of the loot deck
-        loot_df = df[~df['Type'].isin(['Base', 'Advanced', 'SPE'])]
-        
-        equip_df = loot_df.query('Type == "Head" or Type == "Chest" or Type == "Bracers" or Type == "Boots" or Type == "Off-Hand"', inplace=False)
-        weapon_df = loot_df.query('Type == "Weapon" or Type == "Dual"', inplace=False)
-        skill_df = loot_df.query('Type == "Skill" or Type == "Instant"', inplace=False)
-        cantrip_df = loot_df.query('Type == "Cantrip"', inplace=False)
-        for i in range(len(equip_df)):
-            for n in range(int(equip_df['in_deck'].iloc[i])):
-                self.cards.append(card.EquipCard(
-                    equip_df['Name'].iloc[i],
-                    equip_df['Text'].iloc[i],
-                    equip_df['Flavor'].iloc[i],
-                    enums.AccessorClass(equip_df['Class'].iloc[i]),
-                    enums.CardType(equip_df['Type'].iloc[i]),
-                    equip_df['Level'].iloc[i],
-                    equip_df['CD'].iloc[i],
-                    equip_df['CD'].iloc[i],
-                    equip_df['OnPlay'].iloc[i],
-                    equip_df['OnActivate'].iloc[i],
-                    equip_df['OnNextTurn'].iloc[i],
-                    equip_df['OnNextPlayerTurn'].iloc[i],
-                    equip_df['OnRemove'].iloc[i],
-                    equip_df['WhileinPlay'].iloc[i],
-                    equip_df['DurabilityIncrease'].iloc[i],
-                    equip_df['PowerIncrease'].iloc[i],
-                    equip_df['EfficiencyIncrease'].iloc[i],
-                    equip_df['TenacityIncrease'].iloc[i],
-                    equip_df['SensitivityIncrease'].iloc[i],
-                ))
-        for i in range(len(weapon_df)):
-            for n in range(int(weapon_df['in_deck'].iloc[i])):
-                self.cards.append(card.WeaponCard(
-                    weapon_df['Name'].iloc[i],
-                    weapon_df['Text'].iloc[i],
-                    weapon_df['Flavor'].iloc[i],
-                    enums.AccessorClass(weapon_df['Class'].iloc[i]),
-                    enums.CardType(weapon_df['Type'].iloc[i]),
-                    weapon_df['Level'].iloc[i],
-                    weapon_df['CD'].iloc[i],
-                    weapon_df['CD'].iloc[i],
-                    weapon_df['OnPlay'].iloc[i],
-                    weapon_df['OnActivate'].iloc[i],
-                    weapon_df['OnNextTurn'].iloc[i],
-                    weapon_df['OnNextPlayerTurn'].iloc[i],
-                    weapon_df['OnRemove'].iloc[i],
-                    weapon_df['WhileinPlay'].iloc[i],
-                    weapon_df['DurabilityIncrease'].iloc[i],
-                    weapon_df['PowerIncrease'].iloc[i],
-                    weapon_df['EfficiencyIncrease'].iloc[i],
-                    weapon_df['TenacityIncrease'].iloc[i],
-                    weapon_df['SensitivityIncrease'].iloc[i],
-                    weapon_df['is2Handed'].iloc[i],
-                    enums.Stats(weapon_df['AtkStat'].iloc[i]),
-                    enums.Scaling(weapon_df['AtkFunc'].iloc[i]),
-                    weapon_df['AtkCoeff'].iloc[i],
-                    weapon_df['OnHit'].iloc[i],
-                    weapon_df['OnMiss'].iloc[i]
-                ))
-        
-        for i in range(len(skill_df)):
-            isInstant = 1 if (skill_df['Type'].iloc[i] == "Instant") else 0
-            for n in range(int(skill_df['in_deck'].iloc[i])):
-                self.cards.append(card.SkillCard(
-                    skill_df['Name'].iloc[i],
-                    skill_df['Text'].iloc[i],
-                    skill_df['Flavor'].iloc[i],
-                    enums.AccessorClass(skill_df['Class'].iloc[i]),
-                    enums.CardType(skill_df['Type'].iloc[i]),
-                    skill_df['Level'].iloc[i],
-                    skill_df['CD'].iloc[i],
-                    skill_df['CD'].iloc[i],
-                    skill_df['OnPlay'].iloc[i],
-                    skill_df['OnActivate'].iloc[i],
-                    skill_df['OnNextTurn'].iloc[i],
-                    skill_df['OnNextPlayerTurn'].iloc[i],
-                    skill_df['OnRemove'].iloc[i],
-                    skill_df['WhileinPlay'].iloc[i],
-                    isInstant,
-                    skill_df['ChainsWith'].iloc[i],
-                    skill_df['OnHit'].iloc[i],
-                    skill_df['OnMiss'].iloc[i]
-                ))
-        for i in range(len(cantrip_df)):
-            for n in range(int(cantrip_df['in_deck'].iloc[i])):
-                self.cards.append(card.CantripCard(
-                    cantrip_df['Name'].iloc[i],
-                    cantrip_df['Text'].iloc[i],
-                    cantrip_df['Flavor'].iloc[i],
-                    enums.AccessorClass(cantrip_df['Class'].iloc[i]),
-                    enums.CardType(cantrip_df['Type'].iloc[i]),
-                    cantrip_df['Level'].iloc[i],
-                    cantrip_df['CD'].iloc[i],
-                    cantrip_df['CD'].iloc[i],
-                    cantrip_df['OnPlay'].iloc[i],
-                    cantrip_df['OnActivate'].iloc[i],
-                    cantrip_df['OnNextTurn'].iloc[i],
-                    cantrip_df['OnNextPlayerTurn'].iloc[i],
-                    cantrip_df['OnRemove'].iloc[i],
-                    cantrip_df['WhileinPlay'].iloc[i],
-                    cantrip_df['OnHit'].iloc[i],
-                    cantrip_df['OnMiss'].iloc[i]
-                ))
-        
-        random.shuffle(self.cards)
-        print(len(self.cards))
+        print(f"Error loading specs for deck {deck_id}: {e}")
+        return None
